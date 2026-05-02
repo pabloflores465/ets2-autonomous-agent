@@ -30,6 +30,6 @@ class EmergencyStop(py_trees.behaviour.Behaviour):
         # Ambos ocupados o ninguno → no girar, solo frenar
 
         BB.action = DrivingAction(
-            "emergency_stop", accelerate=0.0, brake=1.0, steer=steer, handbrake=True
+            "emergency_stop", accelerate=0.0, brake=1.0, steer=steer, handbrake=False
         )
         return py_trees.common.Status.SUCCESS
