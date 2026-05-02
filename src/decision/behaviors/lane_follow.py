@@ -2,7 +2,6 @@ import py_trees
 
 from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
-from src.perception.lane_detector import LaneType
 from src.perception.minimap import GPSDirection
 
 
@@ -26,7 +25,6 @@ class LaneFollow(py_trees.behaviour.Behaviour):
     def update(self) -> py_trees.common.Status:
         gps = self.world.gps_direction
         gps_int = self.world.gps_intensity
-        lane_info = self.world.lane_info
 
         # Steering GPS
         steer_gps = 0.0
@@ -35,10 +33,10 @@ class LaneFollow(py_trees.behaviour.Behaviour):
         elif gps == GPSDirection.TURN_RIGHT:
             steer_gps = self.MAX_STEER * gps_int * self.GPS_WEIGHT
 
-        # Corrección de carril
+        # Lane correction: desactivada temporalmente (offsets incorrectos en M1)
         steer_lane = 0.0
-        if lane_info is not None and lane_info.lane_type == LaneType.PAINTED:
-            steer_lane = -lane_info.offset_norm * self.MAX_STEER * self.LANE_WEIGHT
+        # if lane_info is not None and lane_info.lane_type == LaneType.PAINTED:
+        #     steer_lane = -lane_info.offset_norm * self.MAX_STEER * self.LANE_WEIGHT
 
         steer = steer_gps + steer_lane
         steer = max(-self.MAX_STEER, min(self.MAX_STEER, steer))
