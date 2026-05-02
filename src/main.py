@@ -25,8 +25,9 @@ from src.decision.context import WorldContext  # noqa: E402
 from src.perception.barrier_detector import detect_barriers  # noqa: E402
 from src.perception.collision_detector import CollisionDetector  # noqa: E402
 from src.perception.detector import YOLODetector  # noqa: E402
-from src.perception.lane_detector import LaneDetector  # noqa: E402
+from src.perception.lane_detector import LaneDetector, LaneType  # noqa: E402
 from src.perception.minimap import MinimapProcessor  # noqa: E402
+from src.perception.road_detector import RoadDetector  # noqa: E402
 from src.perception.speed_detector import SpeedDetector  # noqa: E402
 from src.perception.traffic_light_classifier import TrafficLightClassifier  # noqa: E402
 from src.perception.zones import ZoneAssigner  # noqa: E402
@@ -58,6 +59,7 @@ class ETS2Agent:
         self.light_classifier = TrafficLightClassifier(self.config)
         self.minimap = MinimapProcessor(self.config)
         self.lane_detector = LaneDetector(perc.get("lane_detector"))
+        self.road_detector = RoadDetector()
         self.collision_detector = CollisionDetector(perc.get("collision"))
         self.speed_detector = SpeedDetector(perc.get("speed"))
 
@@ -129,7 +131,11 @@ class ETS2Agent:
             t_per = time.perf_counter()
             detections = self.detector.detect(frame_bgr)
 
-            # Detectar barreras/guardarraíles (no detectados por YOLO)
+            # Eliminar falsos positivos en la zona del capó (timón, dashboard)
+            h, w = frame_bgr.shape[:2]
+            detections = [d for d in detections if d.bbox[1] < h * 0.78]
+
+            # Detectar barreras/guardarraíles
             barriers = detect_barriers(frame_bgr)
             detections.extend(barriers)
 
@@ -148,11 +154,19 @@ class ETS2Agent:
             # Minimapa + carril + colisión
             gps_dir, gps_int, truck_xy = self.minimap.process(frame_bgr)
 
-            # Detectar carril cada 3 frames
+            # Detectar carril cada 3 frames (líneas pintadas)
             if self.frame_id % 3 == 0:
                 lane_info = self.lane_detector.detect(frame_bgr)
             else:
                 lane_info = None
+
+            # Detector de camino por color (funciona en terracería)
+            # Si el carril no se detectó o es dirt, usar road_detector
+            if lane_info is None or lane_info.lane_type in (LaneType.DIRT, LaneType.UNKNOWN) \
+                    or lane_info.confidence < 0.4:
+                road_info = self.road_detector.detect(frame_bgr)
+                if road_info is not None and road_info.confidence > 0.3:
+                    lane_info = road_info
 
             # Colisión cada 4 frames
             if self.frame_id % 4 == 0:
