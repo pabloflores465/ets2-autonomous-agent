@@ -294,7 +294,7 @@ class ETS2Agent:
         cv2.waitKey(1)
 
     def _focus_ets2(self):
-        """Dar foco a ventana ETS2."""
+        """Dar foco a ventana ETS2 y liberar freno de mano."""
         import subprocess
 
         try:
@@ -308,7 +308,14 @@ class ETS2Agent:
                 self.config["actuation"]["steering_center_x"],
                 self.config["actuation"]["steering_center_y"],
             )
-            self.logger.log_event("INFO", "ETS2 focused + clicked")
+            # Liberar freno de mano (space) si estaba puesto de sesión anterior
+            subprocess.run(
+                ["osascript", "-e", 'tell application "System Events" to key code 49'],
+                capture_output=True,
+                timeout=1,
+            )
+            time.sleep(0.3)
+            self.logger.log_event("INFO", "ETS2 focused + clicked + handbrake released")
         except Exception as e:
             self.logger.log_event("WARN", f"Focus failed: {e}")
 
