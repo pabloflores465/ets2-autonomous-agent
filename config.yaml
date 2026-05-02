@@ -90,9 +90,9 @@ actuation:
   steering_center_x: 640         # centro horizontal de la ventana
   steering_center_y: 360         # centro vertical
   accel_key: "up"
-  brake_key: "s"
+  brake_key: "down"
   handbrake_key: "space"
-  reverse_key: "down"          # flecha abajo = reversa
+  reverse_key: "down"          # misma tecla = brake + reverse
   emergency_stop_key: "q"
 
 # --- Logging ---
