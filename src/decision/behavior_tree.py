@@ -12,6 +12,7 @@ from src.decision.behaviors.obstacle_avoid import ObstacleAvoid
 from src.decision.behaviors.traffic_light import TrafficLightBehavior
 from src.decision.behaviors.stop_sign import StopSignBehavior
 from src.decision.behaviors.yield_pedestrian import YieldPedestrian
+from src.decision.behaviors.overtake import Overtake
 from src.decision.behaviors.lane_follow import LaneFollow
 from src.decision.behaviors.cruise import Cruise
 from src.decision.context import WorldContext, DrivingAction
@@ -50,6 +51,7 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
         ├── StopSignBehavior
         ├── ObstacleAvoid
         ├── YieldPedestrian
+        ├── Overtake
         ├── LaneFollow
         └── Cruise
     """
@@ -62,6 +64,7 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
     stop_sign = StopSignBehavior("StopSign", world, config)
     obstacle_avoid = ObstacleAvoid("ObstacleAvoid", world, config)
     yield_pedestrian = YieldPedestrian("YieldPedestrian", world, config)
+    overtake = Overtake("Overtake", world, config)
     lane_follow = LaneFollow("LaneFollow", world, config)
     cruise = Cruise("Cruise", world, config)
 
@@ -73,6 +76,7 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
         stop_sign,
         obstacle_avoid,
         yield_pedestrian,
+        overtake,
         lane_follow,
         cruise,
     ])
