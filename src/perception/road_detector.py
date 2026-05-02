@@ -19,8 +19,9 @@ class RoadDetector:
     """
 
     def __init__(self):
-        self.roi_top = 0.55
-        self.roi_bottom = 0.92
+        # ROI: zona del camino, EXCLUYENDO el timón (Y < 80%)
+        self.roi_top = 0.50
+        self.roi_bottom = 0.78
         self._debug_vis: np.ndarray | None = None
 
     @property
@@ -59,51 +60,45 @@ class RoadDetector:
         mean_color = cv2.mean(sample)[:3]  # BGR
         std_color = np.std(sample.reshape(-1, 3), axis=0)
 
-        # 2. Crear máscara para todos los píxeles con color similar al camino
-        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        # 2. Detectar bordes del camino por TRANSICIÓN de color
+        #    Escanear desde el centro hacia afuera en cada fila
+        #    Donde el color cambia mucho = borde del camino
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        mean_gray = cv2.mean(sample)[0]  # brillo promedio del camino
 
-        # ── Rango ESTRICTO para camino ──
-        # Asfalto/gris: baja saturación (S < 35), brillo medio
-        lower_asphalt = np.array([0, 0, 50])
-        upper_asphalt = np.array([180, 35, 180])
-        asphalt_mask = cv2.inRange(hsv, lower_asphalt, upper_asphalt)
-
-        # Terracería/marrón: H 5-30, S 30-120, V 60-200
-        lower_dirt = np.array([5, 30, 60])
-        upper_dirt = np.array([30, 120, 200])
-        dirt_mask = cv2.inRange(hsv, lower_dirt, upper_dirt)
-
-        # Opcional: incluir color muestreado pero solo si tiene BAJA saturación
-        # (esto permite adaptarse al tono exacto del camino actual)
-        mean_hsv = cv2.cvtColor(np.uint8([[mean_color]]), cv2.COLOR_BGR2HSV)[0][0]
-        if mean_hsv[1] < 40:  # muestra es de baja saturación → es asfalto
-            sample_lower = np.array([max(0, mean_hsv[0] - 20), 0, max(40, mean_hsv[2] - 40)])
-            sample_upper = np.array([min(180, mean_hsv[0] + 20), 40, min(255, mean_hsv[2] + 40)])
-            sample_mask = cv2.inRange(hsv, sample_lower, sample_upper)
-        else:
-            sample_mask = np.zeros_like(asphalt_mask)
-
-        # Unir asfalto + terracería + muestra adaptativa
-        final_mask = cv2.bitwise_or(asphalt_mask, dirt_mask)
-        final_mask = cv2.bitwise_or(final_mask, sample_mask)
-
-        # Limpieza
-        kernel = np.ones((5, 5), np.uint8)
-        final_mask = cv2.morphologyEx(final_mask, cv2.MORPH_CLOSE, kernel)
-        final_mask = cv2.morphologyEx(final_mask, cv2.MORPH_OPEN, kernel)
-
-        # 3. Encontrar bordes izquierdo y derecho del camino
-        # Para cada fila, encontrar el punto más a la izquierda y derecha
-        # que pertenezca al camino
         left_edges = []
         right_edges = []
 
-        for row in range(0, rh, 5):  # muestrear cada 5 filas
-            row_data = final_mask[row, :]
-            road_pixels = np.where(row_data > 0)[0]
-            if len(road_pixels) > rw * 0.2:  # al menos 20% de la fila es camino
-                left_edges.append((road_pixels[0], row))
-                right_edges.append((road_pixels[-1], row))
+        for row in range(0, rh, 3):
+            row_data = gray[row, :]
+
+            # Encontrar bordes: donde el brillo se desvía > 30 del promedio del camino
+            dev = np.abs(row_data.astype(np.int16) - mean_gray)
+            edge_mask = (dev > 30).astype(np.uint8)
+
+            # Encontrar el primer borde a cada lado desde el centro
+            center = rw // 2
+            road_left = None
+            road_right = None
+
+            # Escanear desde el centro hacia la izquierda
+            for x in range(center - 1, 0, -1):
+                if edge_mask[x] == 1:
+                    road_left = x
+                    break
+
+            # Escanear desde el centro hacia la derecha
+            for x in range(center + 1, rw - 1):
+                if edge_mask[x] == 1:
+                    road_right = x
+                    break
+
+            # Si hay bordes a ambos lados y la distancia es razonable
+            if road_left is not None and road_right is not None:
+                road_width = road_right - road_left
+                if rw * 0.15 < road_width < rw * 0.85:
+                    left_edges.append((road_left, row))
+                    right_edges.append((road_right, row))
 
         if len(left_edges) < 3:
             # No se pudo detectar el camino
@@ -137,26 +132,29 @@ class RoadDetector:
 
         # ── Debug visualization ──
         debug = cv2.cvtColor(roi, cv2.COLOR_BGR2BGRA)
-        # Mostrar máscara del camino (verde semitransparente)
-        mask_colored = np.zeros_like(debug)
-        mask_colored[:, :, 1] = final_mask * 80  # verde
-        mask_colored[:, :, 3] = final_mask * 120  # alpha
-        debug = cv2.addWeighted(debug, 1.0, mask_colored, 0.5, 0)
-        # Borde izquierdo
+        # Dibujar región del camino entre bordes izquierdo y derecho
+        if len(left_edges) > 2 and len(right_edges) > 2:
+            left_pts = [(x, y) for x, y in left_edges]
+            right_pts = [(x, y) for x, y in reversed(right_edges)]
+            pts = np.array(left_pts + right_pts, dtype=np.int32)
+            if len(pts) > 2:
+                overlay = debug.copy()
+                cv2.fillPoly(overlay, [pts], (0, 180, 0, 80))  # verde semitransparente
+                debug = cv2.addWeighted(overlay, 0.4, debug, 0.6, 0)
+        # Borde izquierdo (amarillo)
         for x, y in left_edges:
             cv2.circle(debug, (x, y), 2, (0, 255, 255), -1)
-        # Borde derecho
+        # Borde derecho (magenta)
         for x, y in right_edges:
             cv2.circle(debug, (x, y), 2, (255, 0, 255), -1)
-        # Centro detectado
+        # Línea del centro detectado
         cv2.line(debug, (int(road_center), 0), (int(road_center), rh), (0, 0, 255), 2)
         # Centro del frame
         cv2.line(debug, (int(frame_center), 0), (int(frame_center), rh), (255, 255, 255), 1)
-        # Texto
-        cv2.putText(debug, f"road_center={road_center:.0f} offset={offset_norm:.2f}",
-                    (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-        cv2.putText(debug, f"conf={confidence:.2f} left={len(left_edges)} right={len(right_edges)}",
-                    (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.putText(debug, f"offset={offset_norm:.2f} center={road_center:.0f}",
+                    (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
+        cv2.putText(debug, f"conf={confidence:.2f} edges={len(left_edges)}",
+                    (5, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
         self._debug_vis = debug
 
         return LaneInfo(
