@@ -171,6 +171,15 @@ class ETS2Agent:
             # Mostrar debug del road detector
             if self.road_detector.debug_vis is not None and self.frame_id % 3 == 0:
                 cv2.imshow("RoadDetector", self.road_detector.debug_vis)
+                if self.frame_id == 0:
+                    try:
+                        from AppKit import NSApplication, NSFloatingWindowLevel
+                        for win in NSApplication.sharedApplication().windows():
+                            if win.title() == "RoadDetector":
+                                win.setLevel_(NSFloatingWindowLevel)
+                                break
+                    except Exception:
+                        pass
 
             # Colisión cada 4 frames
             if self.frame_id % 4 == 0:
