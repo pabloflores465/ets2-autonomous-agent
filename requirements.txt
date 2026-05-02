@@ -9,3 +9,4 @@ torch>=2.0.0
 torchvision>=0.15.0
 Pillow>=10.0.0
 psutil>=5.9.0
+pyobjc-framework-Quartz>=10.0; sys_platform == 'darwin'
