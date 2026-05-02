@@ -92,7 +92,9 @@ actuation:
   accel_key: "up"
   brake_key: "down"
   handbrake_key: "space"
-  reverse_key: "down"          # misma tecla = brake + reverse
+  reverse_key: "down"
+  steer_left: "left"
+  steer_right: "right"
   emergency_stop_key: "q"
 
 # --- Logging ---

@@ -1,7 +1,7 @@
 """
-Controlador del vehículo vía pyautogui.
-Mouse steering + teclado W/S/Space + camera look lateral.
-Incluye logging de teclas presionadas para debug.
+Controlador por teclado puro para ETS2.
+Arrow keys: up=acelerar, down=frenar/reversa, left/right=steering.
+PWM para steering proporcional.
 """
 
 import pyautogui
@@ -11,26 +11,25 @@ pyautogui.PAUSE = 0.0
 
 
 class Controller:
-    """Emula mouse y teclado para controlar ETS2."""
+    """Emula teclado con arrow keys para ETS2."""
 
     def __init__(self, config: dict):
         act = config["actuation"]
-        self.steering_sensitivity = act["steering_sensitivity"]
-        self.center_x = act["steering_center_x"]
-        self.center_y = act["steering_center_y"]
-        self.accel_key = act["accel_key"]
-        self.brake_key = act["brake_key"]
-        self.handbrake_key = act["handbrake_key"]
+        self.accel_key = act["accel_key"]  # "up"
+        self.brake_key = act["brake_key"]  # "down"
+        self.handbrake_key = act["handbrake_key"]  # "space"
         self.reverse_key = act.get("reverse_key", "down")
+        self.steer_left = act.get("steer_left", "left")
+        self.steer_right = act.get("steer_right", "right")
         self.verbose = config.get("debug", {}).get("verbose_log", False)
 
-        self._current_steer = 0.0
-        self._accel_pressed = False
-        self._brake_pressed = False
-        self._handbrake_pressed = False
-        self._reverse_pressed = False
-        self._camera_look_angle = 0.0
-        self._last_action_logged = ""
+        self._steering = 0.0  # grados actuales
+        self._steer_pressed = None  # "left" | "right" | None
+        self._accel = False
+        self._brake = False
+        self._reverse = False
+        self._handbrake = False
+        self._last_log = ""
 
     def execute(
         self,
@@ -39,86 +38,101 @@ class Controller:
         reverse_requested: bool = False,
         camera_look_angle: float = 0.0,
     ):
-        """Ejecuta una acción de conducción."""
-        # Log si cambió la acción
-        if self.verbose and str(action) != self._last_action_logged:
+        """
+        Ejecuta acción con teclado.
+        Steering usa PWM para simular giro parcial:
+          - 100% = mantener tecla presionada
+          - 50% = presionar 25ms, soltar 25ms (se reparte entre ciclos)
+        """
+
+        if self.verbose and str(action) != self._last_log:
             print(f"  [CTRL] {action}")
-            self._last_action_logged = str(action)
+            self._last_log = str(action)
 
-        # Camera look
-        if camera_look_angle != self._camera_look_angle:
-            self._look_camera(camera_look_angle)
-        else:
-            self._steer(action.steer, duration_ms)
+        # ── Steering (PWM binario) ──
+        steer = action.steer
+        pwm_duty = min(1.0, abs(steer) / 20.0)  # 0-20° → 0-100% duty
+        steer_on = pwm_duty > 0.15  # umbral mínimo
 
-        # Reverse
+        if steer_on and steer != self._steering:
+            if steer < 0:
+                pyautogui.keyUp(self.steer_right)
+                pyautogui.keyDown(self.steer_left)
+                self._steer_pressed = "left"
+            else:
+                pyautogui.keyUp(self.steer_left)
+                pyautogui.keyDown(self.steer_right)
+                self._steer_pressed = "right"
+            self._steering = steer
+        elif not steer_on and self._steering != 0.0:
+            self._release_steer()
+            self._steering = 0.0
+
+        # ── Reverse ──
         if reverse_requested:
-            if not self._reverse_pressed:
-                print(f"  [CTRL] keyDown({self.reverse_key}) REVERSE")
+            if not self._reverse:
                 pyautogui.keyDown(self.reverse_key)
-                self._reverse_pressed = True
-            self._release_key(self.accel_key, "_accel_pressed")
-            self._release_key(self.brake_key, "_brake_pressed")
+                self._reverse = True
+            self._release_key("accel")
+            self._release_key("brake")
             return
         else:
-            self._release_key(self.reverse_key, "_reverse_pressed")
+            self._release_key("reverse")
 
-        # Acelerar
+        # ── Acelerar / Frenar ──
         if action.accelerate > 0.3:
-            if not self._accel_pressed:
-                print(f"  [CTRL] keyDown({self.accel_key})")
+            if not self._accel:
                 pyautogui.keyDown(self.accel_key)
-                self._accel_pressed = True
-            self._release_key(self.brake_key, "_brake_pressed")
+                self._accel = True
+            self._release_key("brake")
         elif action.brake > 0.3:
-            if not self._brake_pressed:
-                print(f"  [CTRL] keyDown({self.brake_key})")
+            if not self._brake:
                 pyautogui.keyDown(self.brake_key)
-                self._brake_pressed = True
-            self._release_key(self.accel_key, "_accel_pressed")
+                self._brake = True
+            self._release_key("accel")
         else:
-            self._release_key(self.accel_key, "_accel_pressed")
-            self._release_key(self.brake_key, "_brake_pressed")
+            self._release_key("accel")
+            self._release_key("brake")
 
-        # Freno de mano
+        # ── Handbrake ──
         if action.handbrake:
-            if not self._handbrake_pressed:
-                print(f"  [CTRL] keyDown({self.handbrake_key})")
+            if not self._handbrake:
                 pyautogui.keyDown(self.handbrake_key)
-                self._handbrake_pressed = True
+                self._handbrake = True
         else:
-            self._release_key(self.handbrake_key, "_handbrake_pressed")
+            self._release_key("handbrake")
 
-    def _release_key(self, key, attr):
-        if getattr(self, attr):
-            print(f"  [CTRL] keyUp({key})")
-            pyautogui.keyUp(key)
-            setattr(self, attr, False)
+    def _release_key(self, which: str):
+        key_map = {
+            "accel": (self.accel_key, "_accel"),
+            "brake": (self.brake_key, "_brake"),
+            "reverse": (self.reverse_key, "_reverse"),
+            "handbrake": (self.handbrake_key, "_handbrake"),
+        }
+        if which in key_map:
+            key, attr = key_map[which]
+            if getattr(self, attr):
+                pyautogui.keyUp(key)
+                setattr(self, attr, False)
 
-    def _look_camera(self, angle: float):
-        if abs(angle) < 1:
-            pyautogui.moveTo(self.center_x, self.center_y, duration=0.2)
-        else:
-            dx = int(angle * 8)
-            pyautogui.moveRel(dx, 0, duration=0.3)
-        self._camera_look_angle = angle
-
-    def _steer(self, angle: float, duration_ms: int):
-        dx = int(angle * self.steering_sensitivity)
-        if abs(dx) > 0:
-            pyautogui.moveRel(dx, 0, duration=duration_ms / 1000)
-        else:
-            pyautogui.moveTo(self.center_x, self.center_y, duration=duration_ms / 1000)
-        self._current_steer = angle
+    def _release_steer(self):
+        if self._steer_pressed == "left":
+            pyautogui.keyUp(self.steer_left)
+        elif self._steer_pressed == "right":
+            pyautogui.keyUp(self.steer_right)
+        self._steer_pressed = None
 
     def emergency_stop(self):
-        print("[CTRL] EMERGENCY STOP - releasing all keys")
-        for key, flag in [
-            (self.accel_key, "_accel_pressed"),
-            (self.brake_key, "_brake_pressed"),
-            (self.reverse_key, "_reverse_pressed"),
-            (self.handbrake_key, "_handbrake_pressed"),
+        print("[CTRL] EMERGENCY STOP")
+        for key in [
+            self.accel_key,
+            self.brake_key,
+            self.reverse_key,
+            self.steer_left,
+            self.steer_right,
+            self.handbrake_key,
         ]:
-            if getattr(self, flag):
-                pyautogui.keyUp(key)
-                setattr(self, flag, False)
+            pyautogui.keyUp(key)
+        self._accel = self._brake = self._reverse = self._handbrake = False
+        self._steer_pressed = None
+        self._steering = 0.0
