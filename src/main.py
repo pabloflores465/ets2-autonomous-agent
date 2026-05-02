@@ -73,15 +73,23 @@ class ETS2Agent:
         self.visualizer = DebugVisualizer(self.config, enabled=debug_enabled)
 
         self.running = False
-        self.paused = False
         self.frame_id = 0
         self._frame_bgr = None
+
+    @property
+    def paused(self) -> bool:
+        """Estado de pausa leído del visualizer."""
+        return self.visualizer.paused
+
+    @paused.setter
+    def paused(self, value: bool):
+        self.visualizer.paused = value
 
     def run(self):
         """Loop principal."""
         self.logger.start_session()
         self.running = True
-        self.logger.log_event("INFO", "Agent started. Controls: P=pause Q=quit")
+        self.logger.log_event("INFO", "Agent started. Buttons or: P=pause Q=quit")
 
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.0
@@ -94,12 +102,13 @@ class ETS2Agent:
         while self.running:
             t_start = time.perf_counter()
 
-            # ── Emergency stop (Ctrl+C or key) ──
-            if self._check_quit():
+            # ── Quit (teclado o botón) ──
+            if self.visualizer.quit_requested:
+                self.logger.log_event("INFO", "Stopped via GUI button")
                 self.running = False
                 break
 
-            # ── Pausa ──
+            # ── Pausa (teclado o botón) ──
             if self.paused:
                 self._show_pause_overlay()
                 time.sleep(0.1)
@@ -220,14 +229,13 @@ class ETS2Agent:
                     gps_intensity=gps_int,
                     steer=steer_value,
                 )
-                # Controles de teclado en ventana
+                # Controles de teclado (botones ya manejados por visualizer)
                 if key in (ord("p"), ord(" ")):
                     self.paused = not self.paused
                     state = "PAUSED" if self.paused else "RESUMED"
-                    self.logger.log_event("INFO", f"Agent {state}")
+                    self.logger.log_event("INFO", f"Agent {state} (keyboard)")
                 elif key == ord("q"):
-                    self.logger.log_event("INFO", "Stopped via window")
-                    self.running = False
+                    self.visualizer.quit_requested = True
 
             # ── Timeout ──
             elapsed = (time.perf_counter() - t_start) * 1000
