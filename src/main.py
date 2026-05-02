@@ -175,7 +175,6 @@ class ETS2Agent:
                     self._road_window_created = True
                     try:
                         from AppKit import NSApplication, NSFloatingWindowLevel
-                        import time
                         time.sleep(0.1)
                         for win in NSApplication.sharedApplication().windows():
                             if "RoadDetector" in str(win.title()):
@@ -338,21 +337,39 @@ class ETS2Agent:
             subprocess.run(
                 ["osascript", "-e", 'tell application "Euro Truck Simulator 2" to activate'],
                 capture_output=True,
-                timeout=3,
+                timeout=5,
             )
             time.sleep(1.0)
             pyautogui.click(
                 self.config["actuation"]["steering_center_x"],
                 self.config["actuation"]["steering_center_y"],
             )
-            # Liberar freno de mano (space) si estaba puesto de sesión anterior
+            # Liberar freno de mano (space) si estaba puesto
             subprocess.run(
                 ["osascript", "-e", 'tell application "System Events" to key code 49'],
                 capture_output=True,
-                timeout=1,
+                timeout=3,
             )
-            time.sleep(0.3)
+            time.sleep(0.2)
             self.logger.log_event("INFO", "ETS2 focused + clicked + handbrake released")
+        except subprocess.TimeoutExpired:
+            self.logger.log_event("WARN", f"Focus subprocess timed out (retrying in background)")
+            # Intentar de nuevo en background, no bloqueante
+            import threading
+            def _retry():
+                try:
+                    subprocess.run(
+                        ["osascript", "-e", 'tell application "Euro Truck Simulator 2" to activate'],
+                        capture_output=True, timeout=5,
+                    )
+                    time.sleep(0.5)
+                    subprocess.run(
+                        ["osascript", "-e", 'tell application "System Events" to key code 49'],
+                        capture_output=True, timeout=3,
+                    )
+                except Exception:
+                    pass
+            threading.Thread(target=_retry, daemon=True).start()
         except Exception as e:
             self.logger.log_event("WARN", f"Focus failed: {e}")
 
