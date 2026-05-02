@@ -1,21 +1,15 @@
 """
-Controlador por AppleScript key codes para ETS2 en macOS.
-Arrow keys: up=126, down=125, left=123, right=124, space=49.
+Controlador por AppleScript key down/up para ETS2 en macOS.
+Mantiene teclas presionadas entre ciclos para acelerar/girar.
 """
 
 import subprocess
 
 
 class Controller:
-    """Envía keystrokes a ETS2 vía osascript (System Events)."""
+    """Envía key down/up a ETS2 vía osascript (System Events)."""
 
-    KEY_CODES = {
-        "up": 126,
-        "down": 125,
-        "left": 123,
-        "right": 124,
-        "space": 49,
-    }
+    KEY_CODES = {"up": 126, "down": 125, "left": 123, "right": 124, "space": 49}
 
     def __init__(self, config: dict):
         act = config["actuation"]
@@ -27,14 +21,9 @@ class Controller:
         self.steer_right = act.get("steer_right", "right")
         self.verbose = config.get("debug", {}).get("verbose_log", False)
 
-        self._steering = 0.0
-        self._steer_pressed = None
-        self._accel = False
-        self._brake = False
-        self._reverse = False
-        self._handbrake = False
+        # Teclas actualmente presionadas
+        self._held = set()
         self._last_log = ""
-        self._last_key = ""  # evitar spam de prints
 
     def execute(
         self,
@@ -47,63 +36,66 @@ class Controller:
             print(f"  [CTRL] {action}")
             self._last_log = str(action)
 
-        steer = action.steer
-        steer_on = abs(steer) > 0.5
+        desired = set()
 
         # ── Steering ──
-        if steer_on:
-            if steer < 0 and self._steer_pressed != "left":
-                self._send_key(self.steer_left)
-                self._steer_pressed = "left"
-            elif steer > 0 and self._steer_pressed != "right":
-                self._send_key(self.steer_right)
-                self._steer_pressed = "right"
-        elif self._steer_pressed is not None:
-            self._steer_pressed = None  # soltar: el key code ya es press+release
+        steer = action.steer
+        if steer < -0.5:
+            desired.add(self.steer_left)
+        elif steer > 0.5:
+            desired.add(self.steer_right)
 
-        # ── Reverse ──
+        # ── Acelerar / Frenar / Reverse ──
         if reverse_requested:
-            if not self._reverse:
-                self._send_key(self.reverse_key)
-                self._reverse = True
-            return
-        elif self._reverse:
-            self._reverse = False
-
-        # ── Acelerar / Frenar ──
-        if action.accelerate > 0.3:
-            if not self._accel:
-                self._send_key(self.accel_key)
-                self._accel = True
-            self._brake = False
+            desired.add(self.reverse_key)
+        elif action.accelerate > 0.3:
+            desired.add(self.accel_key)
         elif action.brake > 0.3:
-            if not self._brake:
-                self._send_key(self.brake_key)
-                self._brake = True
-            self._accel = False
-        else:
-            self._accel = False
-            self._brake = False
+            desired.add(self.brake_key)
 
-        # ── Handbrake ──
+        # ── Handbrake (solo tap, no hold) ──
         if action.handbrake:
-            if not self._handbrake:
-                self._send_key(self.handbrake_key)
-                self._handbrake = True
-        else:
-            self._handbrake = False
+            self._tap(self.handbrake_key)
 
-    def _send_key(self, key_name: str):
-        """Envía un key press vía osascript."""
+        # ── Aplicar cambios: soltar las que ya no se necesitan, presionar nuevas ──
+        to_release = self._held - desired
+        to_press = desired - self._held
+
+        for key in to_release:
+            self._key_up(key)
+        for key in to_press:
+            self._key_down(key)
+
+        self._held = desired
+
+    def _key_down(self, key_name: str):
         code = self.KEY_CODES.get(key_name)
         if code is None:
             return
-        if self.verbose and key_name != self._last_key:
-            print(f"  [KEY] {key_name}")
-            self._last_key = key_name
+        if self.verbose:
+            print(f"  [KEY] DOWN {key_name}")
+        self._osascript(f"key down {code}")
+
+    def _key_up(self, key_name: str):
+        code = self.KEY_CODES.get(key_name)
+        if code is None:
+            return
+        if self.verbose:
+            print(f"  [KEY] UP   {key_name}")
+        self._osascript(f"key up {code}")
+
+    def _tap(self, key_name: str):
+        code = self.KEY_CODES.get(key_name)
+        if code is None:
+            return
+        if self.verbose:
+            print(f"  [KEY] TAP {key_name}")
+        self._osascript(f"key code {code}")
+
+    def _osascript(self, cmd: str):
         try:
             subprocess.run(
-                ["osascript", "-e", f'tell application "System Events" to key code {code}'],
+                ["osascript", "-e", f'tell application "System Events" to {cmd}'],
                 capture_output=True,
                 timeout=1,
             )
@@ -111,7 +103,7 @@ class Controller:
             pass
 
     def emergency_stop(self):
-        print("[CTRL] EMERGENCY STOP")
-        self._accel = self._brake = self._reverse = self._handbrake = False
-        self._steer_pressed = None
-        self._steering = 0.0
+        print("[CTRL] EMERGENCY STOP - release all")
+        for key in list(self._held):
+            self._key_up(key)
+        self._held.clear()
