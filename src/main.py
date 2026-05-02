@@ -168,6 +168,10 @@ class ETS2Agent:
                 if road_info is not None and road_info.confidence > 0.3:
                     lane_info = road_info
 
+            # Mostrar debug del road detector
+            if self.road_detector.debug_vis is not None and self.frame_id % 3 == 0:
+                cv2.imshow("RoadDetector", self.road_detector.debug_vis)
+
             # Colisión cada 4 frames
             if self.frame_id % 4 == 0:
                 collision_info = self.collision_detector.detect(frame_bgr)

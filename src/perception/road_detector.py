@@ -21,6 +21,11 @@ class RoadDetector:
     def __init__(self):
         self.roi_top = 0.55
         self.roi_bottom = 0.92
+        self._debug_vis: np.ndarray | None = None
+
+    @property
+    def debug_vis(self) -> np.ndarray | None:
+        return self._debug_vis
 
     def detect(self, frame_bgr: np.ndarray) -> LaneInfo:
         h, w = frame_bgr.shape[:2]
@@ -131,6 +136,30 @@ class RoadDetector:
             confidence = max(0.3, min(1.0, 1.0 - width_std / (width_mean + 1)))
         else:
             confidence = 0.3
+
+        # ── Debug visualization ──
+        debug = cv2.cvtColor(roi, cv2.COLOR_BGR2BGRA)
+        # Mostrar máscara del camino (verde semitransparente)
+        mask_colored = np.zeros_like(debug)
+        mask_colored[:, :, 1] = final_mask * 80  # verde
+        mask_colored[:, :, 3] = final_mask * 120  # alpha
+        debug = cv2.addWeighted(debug, 1.0, mask_colored, 0.5, 0)
+        # Borde izquierdo
+        for x, y in left_edges:
+            cv2.circle(debug, (x, y), 2, (0, 255, 255), -1)
+        # Borde derecho
+        for x, y in right_edges:
+            cv2.circle(debug, (x, y), 2, (255, 0, 255), -1)
+        # Centro detectado
+        cv2.line(debug, (int(road_center), 0), (int(road_center), rh), (0, 0, 255), 2)
+        # Centro del frame
+        cv2.line(debug, (int(frame_center), 0), (int(frame_center), rh), (255, 255, 255), 1)
+        # Texto
+        cv2.putText(debug, f"road_center={road_center:.0f} offset={offset_norm:.2f}",
+                    (5, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.putText(debug, f"conf={confidence:.2f} left={len(left_edges)} right={len(right_edges)}",
+                    (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        self._debug_vis = debug
 
         return LaneInfo(
             lane_type=LaneType.PAINTED,  # usar como carril aunque sea dirt
