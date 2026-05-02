@@ -49,24 +49,29 @@ class CollisionDetector:
         motion_collision = False
 
         if self.prev_gray is not None:
-            flow = cv2.calcOpticalFlowFarneback(
-                self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0
-            )
-            mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
-            motion_magnitude = float(np.mean(mag))
+            # Verificar tamaño compatible (ventana pudo cambiar de tamaño)
+            if self.prev_gray.shape != gray.shape:
+                self.prev_gray = gray
+                self.motion_history.clear()
+            else:
+                flow = cv2.calcOpticalFlowFarneback(
+                    self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0
+                )
+                mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
+                motion_magnitude = float(np.mean(mag))
 
-            # Historial de movimiento
-            self.motion_history.append(motion_magnitude)
-            if len(self.motion_history) > self.motion_window:
-                self.motion_history.pop(0)
+                # Historial de movimiento
+                self.motion_history.append(motion_magnitude)
+                if len(self.motion_history) > self.motion_window:
+                    self.motion_history.pop(0)
 
-            # Colisión por colapso de flujo
-            if len(self.motion_history) >= self.motion_window:
-                recent_avg = np.mean(self.motion_history[-3:])
-                historical_avg = np.mean(self.motion_history[:-1])
-                if historical_avg > 0.5:  # solo si había movimiento antes
-                    if recent_avg < historical_avg * self.motion_collapse_ratio:
-                        motion_collision = True
+                # Colisión por colapso de flujo
+                if len(self.motion_history) >= self.motion_window:
+                    recent_avg = np.mean(self.motion_history[-3:])
+                    historical_avg = np.mean(self.motion_history[:-1])
+                    if historical_avg > 0.5:  # solo si había movimiento antes
+                        if recent_avg < historical_avg * self.motion_collapse_ratio:
+                            motion_collision = True
 
         self.prev_gray = gray
 
