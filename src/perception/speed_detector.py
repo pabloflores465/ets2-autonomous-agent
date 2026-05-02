@@ -198,6 +198,12 @@ class SpeedDetector:
             self.prev_gray = gray
             return None
 
+        # Verificar tamaño compatible (ventana pudo cambiar de tamaño)
+        if self.prev_gray.shape != gray.shape:
+            self.prev_gray = gray
+            self.flow_history.clear()
+            return None
+
         flow = cv2.calcOpticalFlowFarneback(self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
         mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
         avg_mag = float(np.mean(mag))
