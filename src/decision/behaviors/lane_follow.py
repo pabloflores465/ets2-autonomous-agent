@@ -43,16 +43,12 @@ class LaneFollow(py_trees.behaviour.Behaviour):
         steer = steer_gps + steer_lane
         steer = max(-self.MAX_STEER, min(self.MAX_STEER, steer))
 
-        # Aceleración conservadora según curva
-        is_curving = gps_int > 0.3
-        speed = self._get_speed()
-
-        if is_curving and speed > self.CURVE_SPEED:
-            accelerate = 0.0  # soltar en curva
-        elif gps == GPSDirection.UNKNOWN:
-            accelerate = 0.3  # precaución si no hay GPS
+        # Aceleración: siempre positivo en lane_follow, salvo que venga curva fuerte
+        is_curving = gps_int > 0.6
+        if is_curving:
+            accelerate = 0.4  # reducir en curva cerrada
         else:
-            accelerate = 0.7  # normal en recta
+            accelerate = 1.0  # acelerar a fondo en recta
 
         BB.action = DrivingAction("lane_follow", accelerate=accelerate, brake=0.0, steer=steer)
 

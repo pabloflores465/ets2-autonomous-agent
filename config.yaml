@@ -81,8 +81,8 @@ decision:
   emergency_ttc_threshold: 1.0  # segundos a colisión para frenado emergencia
   safe_distance_px: 150         # distancia mínima frontal (píxeles)
   stop_wait_seconds: 3          # segundos en STOP (señal alto/rojo)
-  recovery_empty_frames: 3      # frames sin detección → reducir velocidad
-  recovery_stop_frames: 10      # frames sin detección → STOP
+  recovery_empty_frames: 30     # frames sin detección → reducir velocidad (2s a 15Hz)
+  recovery_stop_frames: 60      # frames sin detección → STOP
 
 # --- Actuación ---
 actuation:
