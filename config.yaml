@@ -106,7 +106,7 @@ logging:
 
 # --- Debug ---
 debug:
-  enabled: false               # ventana de visualización (desactivar en M1 local)
+  enabled: true               # ventana de visualización (desactivar en M1 local)
   verbose_log: true            # logs de teclas presionadas
   show_fps: true
   save_debug_frames: false

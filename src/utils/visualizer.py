@@ -4,6 +4,7 @@ Muestra en ventanas OpenCV:
   - Frame con bboxes, zonas y líneas de carril
   - Minimapa procesado
   - Panel de estado (comportamiento activo, métricas)
+  - Flechas de dirección GPS y decisión
 """
 
 import cv2
@@ -11,7 +12,7 @@ import numpy as np
 
 from src.perception.detector import Detection
 from src.perception.lane_detector import LaneDetector, LaneInfo
-from src.perception.minimap import MinimapProcessor
+from src.perception.minimap import GPSDirection, MinimapProcessor
 from src.perception.zones import ZoneAssigner, draw_zones
 
 # Colores por clase
@@ -23,6 +24,26 @@ CLASS_COLORS = {
     "person": (255, 128, 0),
     "traffic_light": (255, 255, 0),
     "stop_sign": (0, 0, 255),
+}
+
+# Colores para direcciones
+DIR_COLORS = {
+    "straight": (0, 255, 0),    # Verde
+    "turn_left": (0, 165, 255),  # Naranja
+    "turn_right": (0, 165, 255), # Naranja
+    "unknown": (128, 128, 128),  # Gris
+}
+
+# Colores para behaviors
+BEHAVIOR_COLORS = {
+    "EmergencyStop": (0, 0, 255),
+    "ObstacleAvoid": (0, 128, 255),
+    "TrafficLight": (0, 255, 255),
+    "StopSign": (0, 0, 200),
+    "YieldPedestrian": (255, 128, 0),
+    "LaneFollow": (0, 255, 0),
+    "Cruise": (0, 200, 0),
+    "idle": (128, 128, 128),
 }
 
 
@@ -38,10 +59,243 @@ class DebugVisualizer:
         self.enabled = enabled
         self.window_name = "ETS2 Agent - Perception"
         self.minimap_window = "ETS2 Agent - Minimap"
-        self.status_window = "ETS2 Agent - Status"
+        self.direction_window = "ETS2 Agent - Direction"
 
         # Posiciones de ventanas
         self._window_created = False
+        
+        # Historial de direcciones para suavizar
+        self._gps_history = []
+        self._action_history = []
+        self._max_history = 10
+
+    def _draw_direction_arrow(
+        self,
+        img: np.ndarray,
+        direction: str,
+        intensity: float,
+        center: tuple[int, int],
+        length: int = 80,
+        color: tuple[int, int, int] = (0, 255, 0),
+        thickness: int = 3,
+        label: str = "",
+    ):
+        """Dibuja una flecha de dirección en la imagen."""
+        cx, cy = center
+        
+        # Mapear dirección a ángulo
+        angle_map = {
+            "straight": -90,  # Arriba
+            "turn_left": -135,  # Arriba-izquierda
+            "turn_right": -45,  # Arriba-derecha
+            "unknown": -90,
+        }
+        
+        angle_deg = angle_map.get(direction, -90)
+        # Ajustar ángulo por intensidad para giros
+        if direction == "turn_left":
+            angle_deg = -90 - (intensity * 45)
+        elif direction == "turn_right":
+            angle_deg = -90 + (intensity * 45)
+        
+        angle_rad = np.radians(angle_deg)
+        
+        # Calcular punta de flecha
+        end_x = int(cx + length * np.cos(angle_rad))
+        end_y = int(cy + length * np.sin(angle_rad))
+        
+        # Dibujar flecha
+        cv2.arrowedLine(
+            img,
+            (cx, cy),
+            (end_x, end_y),
+            color,
+            thickness,
+            cv2.LINE_AA,
+            tipLength=0.3,
+        )
+        
+        # Dibujar círculo en la base
+        cv2.circle(img, (cx, cy), 8, color, -1)
+        cv2.circle(img, (cx, cy), 8, (255, 255, 255), 2)
+        
+        # Label
+        if label:
+            cv2.putText(
+                img,
+                label,
+                (cx - 40, cy + 25),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                1,
+            )
+
+    def _draw_behavior_indicator(
+        self,
+        img: np.ndarray,
+        behavior: str,
+        action_str: str,
+        top_left: tuple[int, int],
+        width: int = 250,
+        height: int = 100,
+    ):
+        """Dibuja un panel indicador del behavior activo."""
+        x, y = top_left
+        color = BEHAVIOR_COLORS.get(behavior, (128, 128, 128))
+        
+        # Fondo semi-transparente
+        overlay = img.copy()
+        cv2.rectangle(overlay, (x, y), (x + width, y + height), (0, 0, 0), -1)
+        cv2.addWeighted(img, 0.6, overlay, 0.4, 0, img)
+        
+        # Borde con color del behavior
+        cv2.rectangle(img, (x, y), (x + width, y + height), color, 2)
+        
+        # Título
+        cv2.putText(
+            img,
+            "BEHAVIOR",
+            (x + 10, y + 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (200, 200, 200),
+            1,
+        )
+        
+        # Nombre del behavior (grande)
+        cv2.putText(
+            img,
+            behavior.upper(),
+            (x + 10, y + 50),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            color,
+            2,
+        )
+        
+        # Acción (pequeño)
+        # Truncar acción si es muy larga
+        action_display = action_str[:35] + "..." if len(action_str) > 35 else action_str
+        cv2.putText(
+            img,
+            action_display,
+            (x + 10, y + 75),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.35,
+            (180, 180, 180),
+            1,
+        )
+
+    def _draw_direction_panel(
+        self,
+        img: np.ndarray,
+        gps_direction: str,
+        gps_intensity: float,
+        behavior: str,
+        action_str: str,
+        steer: float,
+    ):
+        """Dibuja panel completo de dirección con flechas grandes."""
+        h, w = img.shape[:2]
+        
+        # Panel de fondo (lado derecho)
+        panel_w = 200
+        panel_h = 250
+        panel_x = w - panel_w - 10
+        panel_y = 10
+        
+        # Fondo semi-transparente
+        overlay = img.copy()
+        cv2.rectangle(
+            overlay,
+            (panel_x, panel_y),
+            (panel_x + panel_w, panel_y + panel_h),
+            (20, 20, 20),
+            -1,
+        )
+        cv2.addWeighted(img, 0.7, overlay, 0.3, 0, img)
+        
+        # Borde
+        cv2.rectangle(
+            img,
+            (panel_x, panel_y),
+            (panel_x + panel_w, panel_y + panel_h),
+            (100, 100, 100),
+            1,
+        )
+        
+        # Título
+        cv2.putText(
+            img,
+            "DIRECTION",
+            (panel_x + 10, panel_y + 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
+        
+        # Flecha GPS (grande)
+        gps_color = DIR_COLORS.get(gps_direction, (128, 128, 128))
+        gps_center = (panel_x + panel_w // 2, panel_y + 80)
+        self._draw_direction_arrow(
+            img,
+            gps_direction,
+            gps_intensity,
+            gps_center,
+            length=50,
+            color=gps_color,
+            thickness=3,
+            label=f"GPS: {gps_direction}",
+        )
+        
+        # Flecha de decisión (basada en behavior y steer)
+        decision_dir = "straight"
+        decision_intensity = 0.5
+        if steer < -5:
+            decision_dir = "turn_left"
+            decision_intensity = min(1.0, abs(steer) / 25)
+        elif steer > 5:
+            decision_dir = "turn_right"
+            decision_intensity = min(1.0, steer / 25)
+        
+        decision_color = BEHAVIOR_COLORS.get(behavior, (0, 255, 0))
+        decision_center = (panel_x + panel_w // 2, panel_y + 160)
+        self._draw_direction_arrow(
+            img,
+            decision_dir,
+            decision_intensity,
+            decision_center,
+            length=40,
+            color=decision_color,
+            thickness=2,
+            label=f"BT: {decision_dir}",
+        )
+        
+        # Info de steer
+        steer_text = f"Steer: {steer:+.1f}°"
+        cv2.putText(
+            img,
+            steer_text,
+            (panel_x + 10, panel_y + 210),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.4,
+            (200, 200, 200),
+            1,
+        )
+        
+        # Intensidad
+        intensity_text = f"Intensity: {gps_intensity:.2f}"
+        cv2.putText(
+            img,
+            intensity_text,
+            (panel_x + 10, panel_y + 230),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.4,
+            (200, 200, 200),
+            1,
+        )
 
     def show(
         self,
@@ -61,6 +315,8 @@ class DebugVisualizer:
         traffic_light: str = "none",
         gps_direction: str = "unknown",
         collision: bool = False,
+        gps_intensity: float = 0.0,
+        steer: float = 0.0,
     ):
         """Renderiza todas las visualizaciones."""
         if not self.enabled:
@@ -122,6 +378,24 @@ class DebugVisualizer:
             1,
         )
 
+        # ── Panel de dirección con flechas ──
+        self._draw_direction_panel(
+            vis,
+            gps_direction,
+            gps_intensity,
+            behavior,
+            action_str,
+            steer,
+        )
+        
+        # ── Indicador de behavior (esquina inferior izquierda) ──
+        self._draw_behavior_indicator(
+            vis,
+            behavior,
+            action_str,
+            (10, h - 110),
+        )
+
         cv2.imshow(self.window_name, vis)
 
         # ── Ventana de minimapa ──
@@ -132,7 +406,7 @@ class DebugVisualizer:
         # Crear ventanas solo la primera vez
         if not self._window_created:
             cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(self.window_name, 960, 540)
+            cv2.resizeWindow(self.window_name, 1280, 720)
             cv2.namedWindow(self.minimap_window, cv2.WINDOW_NORMAL)
             cv2.resizeWindow(self.minimap_window, 360, 270)
             self._window_created = True

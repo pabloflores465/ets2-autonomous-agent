@@ -192,9 +192,14 @@ class ETS2Agent:
             self.logger.log_cycle(metrics)
 
             # ── Visualización ──
-            if self.visualizer.enabled and self.frame_id % 15 == 0:  # cada ~1s
+            if self.visualizer.enabled and self.frame_id % 3 == 0:  # cada ~3 frames
                 if len(detections) == 0:
                     self.logger.log_event("DEBUG", f"F{self.frame_id}: 0 detections")
+                
+                # Obtener steer de la acción actual
+                current_action = BB.action
+                steer_value = current_action.steer if hasattr(current_action, 'steer') else 0.0
+                
                 key = self.visualizer.show(
                     frame=frame_bgr,
                     bgr_frame=frame_bgr,
@@ -212,6 +217,8 @@ class ETS2Agent:
                     traffic_light=tl_state or "none",
                     gps_direction=gps_dir.value if gps_dir else "unknown",
                     collision=(collision_info.collision_detected if collision_info else False),
+                    gps_intensity=gps_int,
+                    steer=steer_value,
                 )
                 # Controles de teclado en ventana
                 if key in (ord("p"), ord(" ")):
