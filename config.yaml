@@ -16,7 +16,7 @@ capture:
 # --- Percepción ---
 perception:
   model: "yolo11n.pt"          # ruta al modelo YOLO
-  device: "mps"                # mps (Apple Silicon), cpu, cuda
+  device: "cpu"                # cpu (mps compite con GPU de ETS2 en M1)
   confidence: 0.45             # umbral de confianza mínimo
   iou: 0.45                    # umbral NMS IoU
   classes_of_interest:         # IDs COCO relevantes
@@ -104,8 +104,8 @@ logging:
 
 # --- Debug ---
 debug:
-  enabled: true                # ventana de visualización
-  verbose_log: true            # logs detallados en consola
+  enabled: false               # ventana de visualización (desactivar en M1 local)
+  verbose_log: true            # logs de teclas presionadas
   show_fps: true
   save_debug_frames: false
   debug_frame_dir: "data/captures"
