@@ -89,7 +89,7 @@ actuation:
   steering_sensitivity: 0.40     # píxeles de mouse por grado de giro
   steering_center_x: 640         # centro horizontal de la ventana
   steering_center_y: 360         # centro vertical
-  accel_key: "w"
+  accel_key: "up"
   brake_key: "s"
   handbrake_key: "space"
   reverse_key: "down"          # flecha abajo = reversa
