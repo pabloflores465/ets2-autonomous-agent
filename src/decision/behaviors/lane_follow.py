@@ -75,7 +75,6 @@ class LaneFollow(py_trees.behaviour.Behaviour):
         self._prev_steer = steer
 
         # ── Aceleración ──
-        if speed < 3:
             accelerate = 1.0
         elif gps_int > 0.5 and gps != GPSDirection.STRAIGHT:
             accelerate = 0.5

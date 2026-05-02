@@ -62,32 +62,30 @@ class RoadDetector:
         # 2. Crear máscara para todos los píxeles con color similar al camino
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
-        # Rango amplio para capturar distintos tipos de camino
-        # Gris/asfalto: H cualquiera, S baja, V media-alta
-        # Marrón/terracería: H 5-35, S 20-120, V 60-200
-        lower = np.array([0, 0, 60])
-        upper = np.array([180, 120, 220])
-        road_mask = cv2.inRange(hsv, lower, upper)
+        # ── Rango ESTRICTO para camino ──
+        # Asfalto/gris: baja saturación (S < 35), brillo medio
+        lower_asphalt = np.array([0, 0, 50])
+        upper_asphalt = np.array([180, 35, 180])
+        asphalt_mask = cv2.inRange(hsv, lower_asphalt, upper_asphalt)
 
-        # También incluir por cercanía al color muestreado (en BGR)
-        bgr_lower = np.array(
-            [max(0, mean_color[0] - std_color[0] * 2 - 30),
-             max(0, mean_color[1] - std_color[1] * 2 - 30),
-             max(0, mean_color[2] - std_color[2] * 2 - 30)],
-            dtype=np.uint8,
-        )
-        bgr_upper = np.array(
-            [min(255, mean_color[0] + std_color[0] * 2 + 30),
-             min(255, mean_color[1] + std_color[1] * 2 + 30),
-             min(255, mean_color[2] + std_color[2] * 2 + 30)],
-            dtype=np.uint8,
-        )
+        # Terracería/marrón: H 5-30, S 30-120, V 60-200
+        lower_dirt = np.array([5, 30, 60])
+        upper_dirt = np.array([30, 120, 200])
+        dirt_mask = cv2.inRange(hsv, lower_dirt, upper_dirt)
 
-        # Máscara por rango BGR
-        bgr_mask = cv2.inRange(roi, bgr_lower, bgr_upper)
+        # Opcional: incluir color muestreado pero solo si tiene BAJA saturación
+        # (esto permite adaptarse al tono exacto del camino actual)
+        mean_hsv = cv2.cvtColor(np.uint8([[mean_color]]), cv2.COLOR_BGR2HSV)[0][0]
+        if mean_hsv[1] < 40:  # muestra es de baja saturación → es asfalto
+            sample_lower = np.array([max(0, mean_hsv[0] - 20), 0, max(40, mean_hsv[2] - 40)])
+            sample_upper = np.array([min(180, mean_hsv[0] + 20), 40, min(255, mean_hsv[2] + 40)])
+            sample_mask = cv2.inRange(hsv, sample_lower, sample_upper)
+        else:
+            sample_mask = np.zeros_like(asphalt_mask)
 
-        # Combinar: el camino debe estar en ambas máscaras
-        final_mask = cv2.bitwise_and(road_mask, bgr_mask)
+        # Unir asfalto + terracería + muestra adaptativa
+        final_mask = cv2.bitwise_or(asphalt_mask, dirt_mask)
+        final_mask = cv2.bitwise_or(final_mask, sample_mask)
 
         # Limpieza
         kernel = np.ones((5, 5), np.uint8)
