@@ -56,6 +56,7 @@ class YOLODetector:
         self.confidence = confidence
         self.iou = iou
         self._device = device
+        self.min_area = 200  # filtrar bboxes muy pequeños (ruido/UI)
 
     def detect(self, frame: np.ndarray) -> list[Detection]:
         """
@@ -78,6 +79,10 @@ class YOLODetector:
                 continue
             confidence = boxes.conf[i].item()
             bbox = boxes.xyxy[i].cpu().numpy()
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+            if w * h < self.min_area:
+                continue
             class_name = self.CLASSES_OF_INTEREST[class_id]
             detections.append(Detection(class_id, class_name, confidence, bbox))
 

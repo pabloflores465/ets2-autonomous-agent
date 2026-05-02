@@ -17,7 +17,7 @@ capture:
 perception:
   model: "yolo11n.pt"          # ruta al modelo YOLO
   device: "mps"                # mps (Apple Silicon), cpu, cuda
-  confidence: 0.35             # umbral de confianza mínimo
+  confidence: 0.45             # umbral de confianza mínimo
   iou: 0.45                    # umbral NMS IoU
   classes_of_interest:         # IDs COCO relevantes
     car: 2

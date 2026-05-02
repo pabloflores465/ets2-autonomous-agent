@@ -183,8 +183,9 @@ class ETS2Agent:
             self.logger.log_cycle(metrics)
 
             # ── Visualización ──
-            if self.visualizer.enabled and self.frame_id % 2 == 0:
-                self.visualizer.log_detections(detections, zones)
+            if self.visualizer.enabled and self.frame_id % 15 == 0:  # cada ~1s
+                if len(detections) == 0:
+                    self.logger.log_event("DEBUG", f"F{self.frame_id}: 0 detections")
                 key = self.visualizer.show(
                     frame=frame_bgr,
                     bgr_frame=frame_bgr,
