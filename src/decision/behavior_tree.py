@@ -9,6 +9,7 @@ from src.decision.behaviors.emergency_stop import EmergencyStop
 from src.decision.behaviors.collision_recovery import CollisionRecovery
 from src.decision.behaviors.intersection import IntersectionHandler
 from src.decision.behaviors.obstacle_avoid import ObstacleAvoid
+from src.decision.behaviors.recovery_mode import RecoveryMode
 from src.decision.behaviors.traffic_light import TrafficLightBehavior
 from src.decision.behaviors.stop_sign import StopSignBehavior
 from src.decision.behaviors.yield_pedestrian import YieldPedestrian
@@ -50,6 +51,7 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
         ├── TrafficLightBehavior
         ├── StopSignBehavior
         ├── ObstacleAvoid
+        ├── RecoveryMode
         ├── YieldPedestrian
         ├── Overtake
         ├── LaneFollow
@@ -63,6 +65,7 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
     traffic_light = TrafficLightBehavior("TrafficLight", world, config)
     stop_sign = StopSignBehavior("StopSign", world, config)
     obstacle_avoid = ObstacleAvoid("ObstacleAvoid", world, config)
+    recovery = RecoveryMode("RecoveryMode", world, config)
     yield_pedestrian = YieldPedestrian("YieldPedestrian", world, config)
     overtake = Overtake("Overtake", world, config)
     lane_follow = LaneFollow("LaneFollow", world, config)
@@ -75,6 +78,7 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
         traffic_light,
         stop_sign,
         obstacle_avoid,
+        recovery,
         yield_pedestrian,
         overtake,
         lane_follow,

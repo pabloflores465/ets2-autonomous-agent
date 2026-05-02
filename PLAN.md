@@ -106,3 +106,35 @@
 - **Cada módulo testeable en aislamiento**
 - **Configuración externalizada**: resolución, rutas, umbrales en `config.yaml`
 - **Reproducibilidad**: misma resolución, FOV, cámara y horario en pruebas
+
+---
+
+## Pendientes para Fases Futuras
+
+### Fase 3: Dataset y Fine-Tuning
+- [ ] Recolectar 1000+ capturas de ETS2 en distintas rutas/horarios/climas
+- [ ] Etiquetar dataset con LabelStudio (clases: car, truck, bus, motorcycle, person, traffic_light, stop_sign)
+- [ ] Fine-tunear YOLO11n con dataset ETS2 (transfer learning, 50 epochs)
+- [ ] Validar mAP por clase, comparar con COCO baseline
+
+### Fase 4: Robustez y Métricas
+- [ ] Dashboard de métricas en tiempo real (FPS, latencia, detecciones, comportamiento activo)
+- [ ] Grabación de video de sesiones de prueba
+- [ ] Estimación de distancia real (no solo área de bbox) para TTC preciso
+- [ ] Control de luces/intermitentes (señalizar en rebases y cruces)
+- [ ] Pruebas multi-ruta (autopista, ciudad, terracería, noche, lluvia)
+- [ ] Ablation study: YOLO11n vs YOLO11s, con/sin lane detection, con/sin GPS
+
+### Fase 5: Evaluación Final
+- [ ] Circuito completo de 30+ minutos sin intervención
+- [ ] Métricas cuantitativas: % señales obedecidas, colisiones, distancia recorrida
+- [ ] Video demostrativo de todos los escenarios
+- [ ] Reporte técnico final (PDF)
+- [ ] Presentación / defensa oral
+
+### Extensiones Opcionales
+- [ ] Segmentación de carriles (YOLO11-seg) en lugar de Canny+Hough
+- [ ] Control PID para aceleración/frenado más suave
+- [ ] Seguimiento multi-objeto con ID persistente (DeepSORT)
+- [ ] Estimación de fin de ruta / estacionamiento automático
+- [ ] Comparativa con modelos más grandes (YOLO11m, YOLO11l)
