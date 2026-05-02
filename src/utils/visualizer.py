@@ -25,6 +25,7 @@ CLASS_COLORS = {
     "person": (255, 128, 0),
     "traffic_light": (255, 255, 0),
     "stop_sign": (0, 0, 255),
+    "barrier": (0, 0, 200),  # barrera/guardarraíl en azul oscuro
 }
 
 # Colores para direcciones

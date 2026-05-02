@@ -39,13 +39,14 @@ perception:
 
   # Detector de carriles (Canny + HoughLinesP)
   lane_detector:
-    canny_low: 50
-    canny_high: 150
-    hough_threshold: 30
-    min_line_length: 60
-    max_line_gap: 40
-    roi_top_pct: 0.55
+    canny_low: 30
+    canny_high: 100
+    hough_threshold: 20
+    min_line_length: 30
+    max_line_gap: 50
+    roi_top_pct: 0.50
     roi_bottom_pct: 0.95
+    expected_lane_width_px: 300
     expected_lane_width_px: 300
     gps_weight: 0.6
     lane_weight: 0.4

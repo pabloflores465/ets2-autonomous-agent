@@ -22,6 +22,7 @@ from src.capture.screen_grabber import ScreenGrabber  # noqa: E402
 from src.decision.blackboard import BB  # noqa: E402
 from src.decision.behavior_tree import build_behavior_tree, get_active_action  # noqa: E402
 from src.decision.context import WorldContext  # noqa: E402
+from src.perception.barrier_detector import detect_barriers  # noqa: E402
 from src.perception.collision_detector import CollisionDetector  # noqa: E402
 from src.perception.detector import YOLODetector  # noqa: E402
 from src.perception.lane_detector import LaneDetector  # noqa: E402
@@ -127,6 +128,11 @@ class ETS2Agent:
             # ── Percepción ──
             t_per = time.perf_counter()
             detections = self.detector.detect(frame_bgr)
+
+            # Detectar barreras/guardarraíles (no detectados por YOLO)
+            barriers = detect_barriers(frame_bgr)
+            detections.extend(barriers)
+
             zones = self.zones.assign(detections)
 
             if len(detections) == 0:

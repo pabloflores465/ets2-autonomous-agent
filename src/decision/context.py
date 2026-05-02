@@ -96,8 +96,14 @@ class WorldContext:
 
         frontal = zones.get("frontal", [])
         capo = zones.get("capo", [])
+        lateral_izq = zones.get("lateral_izq", [])
+        lateral_der = zones.get("lateral_der", [])
 
-        self.obstacle_frontal = len(frontal) > 0
+        # Detectar barreras en cualquier zona (guardarraíl no detectado por YOLO)
+        all_dets = capo + frontal + lateral_izq + lateral_der
+        has_barrier = any(d.class_name == "barrier" for d in all_dets)
+
+        self.obstacle_frontal = len(frontal) > 0 or has_barrier
         self.obstacle_near = len(capo) > 0
         self.obstacle_emergency = any(
             d.area > 5000
