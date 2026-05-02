@@ -116,11 +116,11 @@ class CollisionDetector:
         # Definir regiones de borde
         regions = []
         if bh > 0:
-            regions.append(frame[0:bh, :])          # top
-            regions.append(frame[h - bh : h, :])    # bottom
+            regions.append(frame[0:bh, :])  # top
+            regions.append(frame[h - bh : h, :])  # bottom
         if bw > 0 and (h - 2 * bh) > 0:
-            regions.append(frame[bh : h - bh, 0:bw])          # left
-            regions.append(frame[bh : h - bh, w - bw : w])    # right
+            regions.append(frame[bh : h - bh, 0:bw])  # left
+            regions.append(frame[bh : h - bh, w - bw : w])  # right
 
         if not regions:
             return 0.0

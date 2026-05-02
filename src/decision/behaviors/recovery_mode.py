@@ -1,5 +1,6 @@
 import py_trees
 
+from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
 
 
@@ -36,21 +37,15 @@ class RecoveryMode(py_trees.behaviour.Behaviour):
 
         if empty >= self.STOP_FRAMES:
             # STOP total
-            self.root.blackboard.driving_action = DrivingAction(
-                "recovery_stop", accelerate=0.0, brake=1.0, steer=0.0
-            )
+            BB.action = DrivingAction("recovery_stop", accelerate=0.0, brake=1.0, steer=0.0)
             return py_trees.common.Status.SUCCESS
 
         elif empty >= self.CAUTION_FRAMES:
             # Reducir velocidad
             if speed > self.CAUTION_SPEED:
-                self.root.blackboard.driving_action = DrivingAction(
-                    "recovery_caution", accelerate=0.0, brake=0.5, steer=0.0
-                )
+                BB.action = DrivingAction("recovery_caution", accelerate=0.0, brake=0.5, steer=0.0)
             else:
-                self.root.blackboard.driving_action = DrivingAction(
-                    "recovery_caution", accelerate=0.3, brake=0.0, steer=0.0
-                )
+                BB.action = DrivingAction("recovery_caution", accelerate=0.3, brake=0.0, steer=0.0)
             return py_trees.common.Status.SUCCESS
 
         return py_trees.common.Status.FAILURE

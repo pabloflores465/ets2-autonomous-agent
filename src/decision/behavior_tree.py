@@ -1,6 +1,6 @@
 """
 Árbol de Comportamiento para conducción autónoma en ETS2.
-Usa py_trees para la estructura jerárquica de decisiones.
+Usa py_trees 2.x con blackboard compartido vía Client.
 """
 
 import py_trees
@@ -16,6 +16,7 @@ from src.decision.behaviors.recovery_mode import RecoveryMode
 from src.decision.behaviors.stop_sign import StopSignBehavior
 from src.decision.behaviors.traffic_light import TrafficLightBehavior
 from src.decision.behaviors.yield_pedestrian import YieldPedestrian
+from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
 
 
@@ -70,11 +71,8 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
 
 
 def get_active_action(tree: py_trees.trees.BehaviourTree) -> DrivingAction:
-    """
-    Extrae la acción del blackboard después de un tick.
-    """
-    bb = tree.root.blackboard
-    action = getattr(bb, "driving_action", None)
+    """Extrae la acción del blackboard compartido después de un tick."""
+    action = getattr(BB, "action", None)
     if action is None:
         return DrivingAction.idle()
     return action

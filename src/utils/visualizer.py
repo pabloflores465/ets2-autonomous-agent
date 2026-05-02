@@ -6,7 +6,6 @@ Muestra en ventanas OpenCV:
   - Panel de estado (comportamiento activo, métricas)
 """
 
-
 import cv2
 import numpy as np
 

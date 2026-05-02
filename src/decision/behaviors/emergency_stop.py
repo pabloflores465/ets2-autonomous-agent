@@ -1,5 +1,6 @@
 import py_trees
 
+from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
 
 
@@ -12,7 +13,7 @@ class EmergencyStop(py_trees.behaviour.Behaviour):
 
     def update(self):
         if self.world.obstacle_emergency:
-            self.root.blackboard.driving_action = DrivingAction(
+            BB.action = DrivingAction(
                 "emergency_stop", accelerate=0.0, brake=1.0, steer=0.0, handbrake=True
             )
             return py_trees.common.Status.SUCCESS

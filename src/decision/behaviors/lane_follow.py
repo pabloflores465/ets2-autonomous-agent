@@ -1,5 +1,6 @@
 import py_trees
 
+from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
 from src.perception.lane_detector import LaneType
 from src.perception.minimap import GPSDirection
@@ -53,9 +54,7 @@ class LaneFollow(py_trees.behaviour.Behaviour):
         else:
             accelerate = 0.7  # normal en recta
 
-        self.root.blackboard.driving_action = DrivingAction(
-            "lane_follow", accelerate=accelerate, brake=0.0, steer=steer
-        )
+        BB.action = DrivingAction("lane_follow", accelerate=accelerate, brake=0.0, steer=steer)
 
         return py_trees.common.Status.SUCCESS
 

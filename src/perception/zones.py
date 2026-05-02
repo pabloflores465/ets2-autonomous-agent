@@ -3,7 +3,6 @@ Asignación de detecciones a zonas lógicas de percepción.
 Cada zona es una región del frame definida por porcentajes.
 """
 
-
 import numpy as np
 
 from src.perception.detector import Detection

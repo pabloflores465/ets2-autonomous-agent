@@ -1,5 +1,6 @@
 import py_trees
 
+from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
 
 
@@ -50,7 +51,7 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
 
         if self.phase == 0:
             # Frenar fuerte
-            self.root.blackboard.driving_action = DrivingAction(
+            BB.action = DrivingAction(
                 "collision_brake", accelerate=0.0, brake=1.0, steer=0.0, handbrake=True
             )
             if self.phase_timer > 0.5:
@@ -60,7 +61,7 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
 
         elif self.phase == 1:
             # Esperar estabilización
-            self.root.blackboard.driving_action = DrivingAction(
+            BB.action = DrivingAction(
                 "collision_wait", accelerate=0.0, brake=0.0, steer=0.0, handbrake=False
             )
             if self.phase_timer > 1.0:
@@ -79,14 +80,14 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
             action = DrivingAction(
                 "collision_reverse", accelerate=0.0, brake=0.0, steer=steer, handbrake=False
             )
-            setattr(self.root.blackboard, "reverse_requested", True)
-            self.root.blackboard.driving_action = action
+            setattr(BB, "reverse_requested", True)
+            BB.action = action
 
             if self.phase_timer > self.REVERSE_DURATION_S:
                 self.phase = 3
                 self.phase_timer = 0.0
-                setattr(self.root.blackboard, "reverse_requested", False)
-                setattr(self.root.blackboard, "collision_recovered", True)
+                setattr(BB, "reverse_requested", False)
+                setattr(BB, "collision_recovered", True)
             return py_trees.common.Status.RUNNING
 
         elif self.phase == 3:

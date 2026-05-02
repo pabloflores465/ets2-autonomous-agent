@@ -1,5 +1,6 @@
 import py_trees
 
+from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
 
 
@@ -112,15 +113,13 @@ class Overtake(py_trees.behaviour.Behaviour):
             if self.phase_timer > 10.0:
                 self.phase = 6  # abortar, timeout
                 return py_trees.common.Status.RUNNING
-            self.root.blackboard.driving_action = DrivingAction(
-                "overtake_wait", accelerate=0.3, brake=0.0, steer=0.0
-            )
+            BB.action = DrivingAction("overtake_wait", accelerate=0.3, brake=0.0, steer=0.0)
             return py_trees.common.Status.RUNNING
 
     def _phase_change_left(self) -> py_trees.common.Status:
         """Cambiar al carril izquierdo."""
         # Steer suave a la izquierda
-        self.root.blackboard.driving_action = DrivingAction(
+        BB.action = DrivingAction(
             "overtake_change_left", accelerate=0.8, brake=0.0, steer=-self.LANE_CHANGE_STEER
         )
 
@@ -135,16 +134,12 @@ class Overtake(py_trees.behaviour.Behaviour):
         # Verificar que seguimos viendo al vehículo (que no chocamos)
         if self.world.obstacle_emergency:
             # ¡Peligro! Frenar
-            self.root.blackboard.driving_action = DrivingAction(
-                "overtake_abort", accelerate=0.0, brake=1.0, steer=0.0
-            )
+            BB.action = DrivingAction("overtake_abort", accelerate=0.0, brake=1.0, steer=0.0)
             self.phase = 6
             return py_trees.common.Status.RUNNING
 
         # Acelerar a fondo para pasar
-        self.root.blackboard.driving_action = DrivingAction(
-            "overtake_passing", accelerate=1.0, brake=0.0, steer=0.0
-        )
+        BB.action = DrivingAction("overtake_passing", accelerate=1.0, brake=0.0, steer=0.0)
 
         # Pasar cuando el vehículo ya no está en zona frontal
         # Y podemos verlo en espejo derecho (ya lo pasamos)
@@ -184,14 +179,12 @@ class Overtake(py_trees.behaviour.Behaviour):
                 self.phase = 5
                 self.phase_timer = 0.0
                 return py_trees.common.Status.RUNNING
-            self.root.blackboard.driving_action = DrivingAction(
-                "overtake_wait_right", accelerate=0.5, brake=0.0, steer=0.0
-            )
+            BB.action = DrivingAction("overtake_wait_right", accelerate=0.5, brake=0.0, steer=0.0)
             return py_trees.common.Status.RUNNING
 
     def _phase_return_right(self) -> py_trees.common.Status:
         """Retornar a carril derecho."""
-        self.root.blackboard.driving_action = DrivingAction(
+        BB.action = DrivingAction(
             "overtake_return", accelerate=0.5, brake=0.0, steer=self.LANE_CHANGE_STEER
         )
 

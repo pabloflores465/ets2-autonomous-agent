@@ -19,6 +19,7 @@ sys.path.insert(0, PROJECT_ROOT)
 # ruff: noqa: I001
 from src.actuation.controller import Controller  # noqa: E402
 from src.capture.screen_grabber import ScreenGrabber  # noqa: E402
+from src.decision.blackboard import BB  # noqa: E402
 from src.decision.behavior_tree import build_behavior_tree, get_active_action  # noqa: E402
 from src.decision.context import WorldContext  # noqa: E402
 from src.perception.collision_detector import CollisionDetector  # noqa: E402
@@ -145,16 +146,16 @@ class ETS2Agent:
             t_dec = time.perf_counter()
             self.bt.tick()
             action = get_active_action(self.bt)
-            reverse_req = getattr(self.bt.root.blackboard, "reverse_requested", False)
-            if getattr(self.bt.root.blackboard, "collision_recovered", False):
+            reverse_req = getattr(BB, "reverse_requested", False)
+            if getattr(BB, "collision_recovered", False):
                 self.world.collision_recovered = True
                 self.collision_detector.reset()
-                setattr(self.bt.root.blackboard, "collision_recovered", False)
+                setattr(BB, "collision_recovered", False)
             dec_ms = (time.perf_counter() - t_dec) * 1000
 
             # ── Actuación ──
             t_act = time.perf_counter()
-            cam_look = getattr(self.bt.root.blackboard, "camera_look_angle", 0.0)
+            cam_look = getattr(BB, "camera_look_angle", 0.0)
             self.controller.execute(
                 action, duration_ms=50, reverse_requested=reverse_req, camera_look_angle=cam_look
             )

@@ -1,5 +1,6 @@
 import py_trees
 
+from src.decision.blackboard import BB
 from src.decision.context import DrivingAction, WorldContext
 
 
@@ -34,9 +35,7 @@ class Cruise(py_trees.behaviour.Behaviour):
         elif speed < 10.0:
             accelerate = 1.0  # arranque: acelerar a fondo
 
-        self.root.blackboard.driving_action = DrivingAction(
-            "cruise", accelerate=accelerate, brake=0.0, steer=0.0
-        )
+        BB.action = DrivingAction("cruise", accelerate=accelerate, brake=0.0, steer=0.0)
 
         return py_trees.common.Status.SUCCESS
 
