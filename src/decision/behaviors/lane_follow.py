@@ -8,13 +8,12 @@ from src.perception.minimap import GPSDirection
 
 class LaneFollow(py_trees.behaviour.Behaviour):
     """
-    Seguir carril usando cámara (líneas de carril) como fuente principal.
-    GPS del minimapa solo para navegación general (intersecciones).
-    90% lane detection, 10% GPS.
+    Seguir camino usando cámara + GPS.
+    - Si hay líneas de carril: 90% cámara, 10% GPS (conducción precisa)
+    - Si es terracería (DIRT): 80% GPS, usa minimapa como guía principal
+    - Si no hay info de carril: 100% GPS
     """
 
-    GPS_WEIGHT = 0.1   # minimapa: solo nudge suave en curvas
-    LANE_WEIGHT = 0.9  # cámara: seguimiento de carril principal
     MAX_STEER = 25.0
 
     def __init__(self, name: str, world: WorldContext, config: dict = None):
@@ -26,6 +25,7 @@ class LaneFollow(py_trees.behaviour.Behaviour):
         gps = self.world.gps_direction
         gps_int = self.world.gps_intensity
         speed = self._get_speed()
+        lane = self.world.lane_info
 
         # ── Steering limit según velocidad ──
         if speed < 5:
@@ -37,23 +37,36 @@ class LaneFollow(py_trees.behaviour.Behaviour):
         else:
             max_steer = self.MAX_STEER
 
-        # ── Steering: 90% carril (cámara) ──
-        steer_lane = 0.0
-        if self.world.lane_info is not None and self.world.lane_info.lane_type == LaneType.PAINTED:
-            steer_lane = -self.world.lane_info.offset_norm * max_steer * self.LANE_WEIGHT
+        # ── Elegir pesos según tipo de camino ──
+        if lane is not None and lane.lane_type == LaneType.PAINTED:
+            # Camino con líneas: usar carril como guía principal
+            gps_weight = 0.1
+            lane_weight = 0.9
+        elif lane is not None and lane.lane_type == LaneType.DIRT:
+            # Terracería: minimapa guía, sin líneas pintadas
+            gps_weight = 0.8
+            lane_weight = 0.2  # usar borde del camino si es detectable
+        else:
+            # Sin info de carril: solo GPS
+            gps_weight = 1.0
+            lane_weight = 0.0
 
-        # ── GPS: solo 10%, solo para curvas pronunciadas (intersecciones) ──
+        # ── Steering por carril (si hay) ──
+        steer_lane = 0.0
+        if lane is not None and lane.lane_type == LaneType.PAINTED:
+            steer_lane = -lane.offset_norm * max_steer * lane_weight
+
+        # ── Steering por GPS (minimapa) ──
         steer_gps = 0.0
-        if gps in (GPSDirection.TURN_LEFT, GPSDirection.TURN_RIGHT) and gps_int > 0.3:
+        if gps in (GPSDirection.TURN_LEFT, GPSDirection.TURN_RIGHT) and gps_int > 0.15:
             if gps == GPSDirection.TURN_LEFT:
-                steer_gps = -max_steer * gps_int * self.GPS_WEIGHT
+                steer_gps = -max_steer * gps_int * gps_weight
             else:
-                steer_gps = max_steer * gps_int * self.GPS_WEIGHT
+                steer_gps = max_steer * gps_int * gps_weight
 
         steer = steer_lane + steer_gps
         steer = max(-max_steer, min(max_steer, steer))
 
-        # Dead zone
         if abs(steer) < 0.5:
             steer = 0.0
 

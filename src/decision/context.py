@@ -99,15 +99,20 @@ class WorldContext:
         lateral_izq = zones.get("lateral_izq", [])
         lateral_der = zones.get("lateral_der", [])
 
-        # Detectar barreras en cualquier zona (guardarraíl no detectado por YOLO)
+        # Detectar barreras en cualquier zona (guardarraíl detectado por CV)
         all_dets = capo + frontal + lateral_izq + lateral_der
         has_barrier = any(d.class_name == "barrier" for d in all_dets)
 
-        self.obstacle_frontal = len(frontal) > 0 or has_barrier
-        self.obstacle_near = len(capo) > 0
+        # NO contar detecciones en capó (timón/dashboard) como obstáculos
+        # Solo barreras reales en capó son peligrosas
+        capo_real = [d for d in capo if d.class_name == "barrier"]
+        frontal_real = [d for d in frontal if d.class_name != "barrier" or True]
+
+        self.obstacle_frontal = len(frontal_real) > 0 or has_barrier
+        self.obstacle_near = len(capo_real) > 0
         self.obstacle_emergency = any(
             d.area > 5000
-            for d in capo + frontal
+            for d in frontal_real
             if d.class_name in ("car", "truck", "bus", "motorcycle")
         )
         self.pedestrian_in_path = any(d.class_name == "person" for d in capo + frontal)
