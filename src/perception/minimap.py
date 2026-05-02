@@ -90,9 +90,9 @@ class MinimapProcessor:
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
         h, w = roi.shape[:2]
 
-        # Verde en HSV (H 40-85 en OpenCV)
-        lower_green = np.array([40, 60, 60])
-        upper_green = np.array([85, 255, 255])
+        # Verde en HSV (H 35-95, amplio para capturar distintos tonos)
+        lower_green = np.array([35, 40, 40])
+        upper_green = np.array([95, 255, 255])
         green_mask = cv2.inRange(hsv, lower_green, upper_green)
 
         # Limpieza
@@ -188,10 +188,10 @@ class MinimapProcessor:
         red_mask = mask1 | mask2
 
         kernel = np.ones((3, 3), np.uint8)
-        # Erosión fuerte para eliminar puntos rojos aislados (red dot del camión, iconos)
-        red_mask = cv2.erode(red_mask, kernel, iterations=2)
-        # Dilatar para reconectar la línea roja
-        red_mask = cv2.dilate(red_mask, kernel, iterations=2)
+        # Abrir: elimina puntos pequeños (red dot), mantiene línea fina
+        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        # Cerrar: rellena huecos en la línea
+        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
         if cv2.countNonZero(red_mask) < 50:
             return GPSDirection.UNKNOWN, 0.0
@@ -202,8 +202,8 @@ class MinimapProcessor:
         if not contours:
             return GPSDirection.UNKNOWN, 0.0
 
-        # Filtrar contornos pequeños (ruido que sobrevivió a erosión)
-        large_contours = [c for c in contours if cv2.contourArea(c) > 20]
+        # Filtrar contornos pequeños (red dot si sobrevivió, iconos)
+        large_contours = [c for c in contours if cv2.contourArea(c) > 30]
         if not large_contours:
             return GPSDirection.UNKNOWN, 0.0
 
