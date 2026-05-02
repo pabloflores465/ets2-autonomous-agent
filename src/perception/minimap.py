@@ -178,9 +178,9 @@ class MinimapProcessor:
         """
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
-        lower_red1 = np.array([0, 100, 100])
+        lower_red1 = np.array([0, 80, 80])
         upper_red1 = np.array([10, 255, 255])
-        lower_red2 = np.array([160, 100, 100])
+        lower_red2 = np.array([160, 80, 80])
         upper_red2 = np.array([180, 255, 255])
 
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
@@ -188,8 +188,10 @@ class MinimapProcessor:
         red_mask = mask1 | mask2
 
         kernel = np.ones((3, 3), np.uint8)
-        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel)
-        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel)
+        # Erosión fuerte para eliminar puntos rojos aislados (red dot del camión, iconos)
+        red_mask = cv2.erode(red_mask, kernel, iterations=2)
+        # Dilatar para reconectar la línea roja
+        red_mask = cv2.dilate(red_mask, kernel, iterations=2)
 
         if cv2.countNonZero(red_mask) < 50:
             return GPSDirection.UNKNOWN, 0.0
@@ -200,7 +202,12 @@ class MinimapProcessor:
         if not contours:
             return GPSDirection.UNKNOWN, 0.0
 
-        largest = max(contours, key=cv2.contourArea)
+        # Filtrar contornos pequeños (ruido que sobrevivió a erosión)
+        large_contours = [c for c in contours if cv2.contourArea(c) > 20]
+        if not large_contours:
+            return GPSDirection.UNKNOWN, 0.0
+
+        largest = max(large_contours, key=cv2.contourArea)
         if len(largest) < 5:
             return GPSDirection.UNKNOWN, 0.0
 
