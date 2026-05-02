@@ -24,6 +24,7 @@ class Controller:
         # Teclas actualmente presionadas
         self._held = set()
         self._last_log = ""
+        self._steer_smooth = 0.0  # steering suavizado
 
     def execute(
         self,
@@ -38,8 +39,12 @@ class Controller:
 
         desired = set()
 
-        # ── Steering ──
+        # ── Steering con suavizado ──
         steer = action.steer
+        # Suavizado exponencial: 30% del nuevo valor, 70% del anterior
+        self._steer_smooth = self._steer_smooth * 0.7 + steer * 0.3
+        steer = self._steer_smooth
+
         if steer < -0.5:
             desired.add(self.steer_left)
         elif steer > 0.5:

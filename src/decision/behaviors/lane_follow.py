@@ -14,7 +14,7 @@ class LaneFollow(py_trees.behaviour.Behaviour):
 
     GPS_WEIGHT = 0.6
     LANE_WEIGHT = 0.4
-    MAX_STEER = 25.0
+    MAX_STEER = 8.0  # reducido: era 25.0
 
     CURVE_SPEED = 45.0  # km/h objetivo en curvas
     STRAIGHT_SPEED = 70.0  # km/h objetivo en recta
@@ -42,6 +42,10 @@ class LaneFollow(py_trees.behaviour.Behaviour):
 
         steer = steer_gps + steer_lane
         steer = max(-self.MAX_STEER, min(self.MAX_STEER, steer))
+
+        # Dead zone: ignorar steering muy pequeño
+        if abs(steer) < 0.3:
+            steer = 0.0
 
         # Aceleración: siempre positivo en lane_follow, salvo que venga curva fuerte
         is_curving = gps_int > 0.6
