@@ -192,13 +192,14 @@ class SpeedDetector:
         """
         Estima velocidad por optical flow (magnitud de movimiento).
         """
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+        # Reducir resolución para optical flow (mucho más rápido)
+        small = cv2.resize(frame_bgr, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
+        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
 
         if self.prev_gray is None:
             self.prev_gray = gray
             return None
 
-        # Verificar tamaño compatible (ventana pudo cambiar de tamaño)
         if self.prev_gray.shape != gray.shape:
             self.prev_gray = gray
             self.flow_history.clear()
@@ -206,7 +207,7 @@ class SpeedDetector:
 
         flow = cv2.calcOpticalFlowFarneback(self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
         mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
-        avg_mag = float(np.mean(mag))
+        avg_mag = float(np.mean(mag)) * 2.0  # compensar escala
 
         self.prev_gray = gray
 

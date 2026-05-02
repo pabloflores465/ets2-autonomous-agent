@@ -141,9 +141,24 @@ class ETS2Agent:
 
             # Minimapa + carril + colisión
             gps_dir, gps_int, truck_xy = self.minimap.process(frame_bgr)
-            lane_info = self.lane_detector.detect(frame_bgr)
-            collision_info = self.collision_detector.detect(frame_bgr)
-            speed_info = self.speed_detector.detect(frame_bgr)
+
+            # Detectar carril cada 3 frames
+            if self.frame_id % 3 == 0:
+                lane_info = self.lane_detector.detect(frame_bgr)
+            else:
+                lane_info = None
+
+            # Colisión cada 4 frames
+            if self.frame_id % 4 == 0:
+                collision_info = self.collision_detector.detect(frame_bgr)
+            else:
+                collision_info = None
+
+            # Velocidad cada 3 frames
+            if self.frame_id % 3 == 1:
+                speed_info = self.speed_detector.detect(frame_bgr)
+            else:
+                speed_info = None
 
             per_ms = (time.perf_counter() - t_per) * 1000
 

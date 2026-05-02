@@ -16,7 +16,7 @@ capture:
 # --- Percepción ---
 perception:
   model: "yolo11n.pt"          # ruta al modelo YOLO
-  device: "cpu"                # cpu (mps compite con GPU de ETS2 en M1)
+  device: "mps"                # mps (GPU Apple Silicon) mucho más rápido que cpu
   confidence: 0.45             # umbral de confianza mínimo
   iou: 0.45                    # umbral NMS IoU
   classes_of_interest:         # IDs COCO relevantes

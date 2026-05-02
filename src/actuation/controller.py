@@ -41,7 +41,6 @@ class Controller:
 
         # ── Steering con suavizado ──
         steer = action.steer
-        # Suavizado suave: 50% anterior + 50% nuevo
         self._steer_smooth = self._steer_smooth * 0.5 + steer * 0.5
         steer = self._steer_smooth
 
@@ -66,12 +65,38 @@ class Controller:
         to_release = self._held - desired
         to_press = desired - self._held
 
-        for key in to_release:
-            self._key_up(key)
+        # Batch todos los comandos en una sola llamada osascript
+        cmds_press = []
         for key in to_press:
-            self._key_down(key)
+            code = self.KEY_CODES.get(key)
+            if code is not None:
+                cmds_press.append(f"key down {code}")
+                if self.verbose:
+                    print(f"  [KEY] DOWN {key}")
+        cmds_release = []
+        for key in to_release:
+            code = self.KEY_CODES.get(key)
+            if code is not None:
+                cmds_release.append(f"key up {code}")
+                if self.verbose:
+                    print(f"  [KEY] UP   {key}")
+
+        if cmds_press or cmds_release:
+            all_cmds = cmds_release + cmds_press
+            script = 'tell application "System Events"\n' + '\n'.join(all_cmds) + '\nend tell'
+            self._osascript_raw(script)
 
         self._held = desired
+
+    def _osascript_raw(self, script: str):
+        try:
+            subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                timeout=1,
+            )
+        except Exception:
+            pass
 
     def _key_down(self, key_name: str):
         code = self.KEY_CODES.get(key_name)

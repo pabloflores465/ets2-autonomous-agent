@@ -66,7 +66,7 @@ class YOLODetector:
         Returns:
             Lista de Detection filtradas por clases de interés.
         """
-        results = self.model(frame, conf=self.confidence, iou=self.iou, verbose=False)
+        results = self.model(frame, conf=self.confidence, iou=self.iou, imgsz=320, verbose=False)
         detections = []
 
         if len(results) == 0 or results[0].boxes is None:

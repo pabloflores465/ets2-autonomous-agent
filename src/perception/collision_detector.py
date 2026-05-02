@@ -42,14 +42,15 @@ class CollisionDetector:
         Detecta colisión en el frame actual.
         Debe llamarse una vez por frame.
         """
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Reducir resolución para optical flow (mucho más rápido)
+        small = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
+        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
 
-        # --- Optical Flow ---
+        # --- Optical Flow (a media resolución) ---
         motion_magnitude = 0.0
         motion_collision = False
 
         if self.prev_gray is not None:
-            # Verificar tamaño compatible (ventana pudo cambiar de tamaño)
             if self.prev_gray.shape != gray.shape:
                 self.prev_gray = gray
                 self.motion_history.clear()
@@ -58,7 +59,7 @@ class CollisionDetector:
                     self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0
                 )
                 mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
-                motion_magnitude = float(np.mean(mag))
+                motion_magnitude = float(np.mean(mag)) * 2.0  # compensar escala
 
                 # Historial de movimiento
                 self.motion_history.append(motion_magnitude)
