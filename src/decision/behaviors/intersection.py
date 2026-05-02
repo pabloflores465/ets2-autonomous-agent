@@ -1,5 +1,6 @@
 import py_trees
-from src.decision.context import WorldContext, DrivingAction
+
+from src.decision.context import DrivingAction, WorldContext
 from src.perception.minimap import GPSDirection
 
 
@@ -18,16 +19,16 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
     Requiere que controller soporte camera_look (mouse mirar izq/der).
     """
 
-    INTERSECTION_SPEED = 20.0    # km/h al aproximar
-    CROSS_SPEED = 15.0           # km/h al cruzar
-    LOOK_ANGLE = 60.0             # grados de giro de cámara
-    LOOK_DURATION_S = 1.5         # segundos mirando cada lado
-    MAX_WAIT_S = 5.0              # timeout espera
+    INTERSECTION_SPEED = 20.0  # km/h al aproximar
+    CROSS_SPEED = 15.0  # km/h al cruzar
+    LOOK_ANGLE = 60.0  # grados de giro de cámara
+    LOOK_DURATION_S = 1.5  # segundos mirando cada lado
+    MAX_WAIT_S = 5.0  # timeout espera
 
     def __init__(self, name: str, world: WorldContext, config: dict = None):
         super().__init__(name)
         self.world = world
-        self.phase = 0            # 0=approach, 1=look_left, 2=look_right, 3=wait, 4=cross, 5=done
+        self.phase = 0  # 0=approach, 1=look_left, 2=look_right, 3=wait, 4=cross, 5=done
         self.phase_timer = 0.0
         self.last_tick_time = None
         self.wait_start = 0.0
@@ -40,16 +41,14 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
 
     def update(self) -> py_trees.common.Status:
         import time
+
         now = time.monotonic()
 
         # Solo activar si GPS indica giro fuerte (intersección)
         gps = self.world.gps_direction
         gps_int = self.world.gps_intensity
 
-        is_intersection = (
-            gps in (GPSDirection.TURN_LEFT, GPSDirection.TURN_RIGHT) and
-            gps_int > 0.5
-        )
+        is_intersection = gps in (GPSDirection.TURN_LEFT, GPSDirection.TURN_RIGHT) and gps_int > 0.5
         if not is_intersection and self.phase == 0:
             return py_trees.common.Status.FAILURE
 
@@ -75,7 +74,8 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
     def _phase_approach(self) -> py_trees.common.Status:
         """Reducir velocidad al aproximar intersección."""
         self.root.blackboard.driving_action = DrivingAction(
-            "intersection_approach", accelerate=0.0, brake=0.3, steer=0.0)
+            "intersection_approach", accelerate=0.0, brake=0.3, steer=0.0
+        )
         if self.phase_timer > 0.5:
             self.phase = 1
             self.phase_timer = 0.0
@@ -98,9 +98,10 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
             setattr(self.root.blackboard, "camera_look_angle", angle)
 
             # Verificar espejo de ese lado
-            side_clear = self._check_side(self.look_direction)
+            self._check_side(self.look_direction)
             self.root.blackboard.driving_action = DrivingAction(
-                "intersection_look", accelerate=0.0, brake=0.5, steer=0.0)
+                "intersection_look", accelerate=0.0, brake=0.5, steer=0.0
+            )
 
         elif self.phase_timer < self.LOOK_DURATION_S * 2:
             # Mirar el otro lado
@@ -108,9 +109,10 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
             angle = self.LOOK_ANGLE if other == "left" else -self.LOOK_ANGLE
             setattr(self.root.blackboard, "camera_look_angle", angle)
 
-            side_clear = self._check_side(other)
+            self._check_side(other)
             self.root.blackboard.driving_action = DrivingAction(
-                "intersection_look", accelerate=0.0, brake=0.5, steer=0.0)
+                "intersection_look", accelerate=0.0, brake=0.5, steer=0.0
+            )
         else:
             # Volver cámara al frente
             setattr(self.root.blackboard, "camera_look_angle", 0.0)
@@ -128,7 +130,8 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
     def _phase_wait(self, now: float) -> py_trees.common.Status:
         """Esperar a que la vía lateral esté libre."""
         self.root.blackboard.driving_action = DrivingAction(
-            "intersection_wait", accelerate=0.0, brake=1.0, steer=0.0)
+            "intersection_wait", accelerate=0.0, brake=1.0, steer=0.0
+        )
 
         if self._both_sides_clear():
             self.phase = 3
@@ -138,7 +141,8 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
         if (now - self.wait_start) > self.MAX_WAIT_S:
             # Timeout: avanzar con precaución
             self.root.blackboard.driving_action = DrivingAction(
-                "intersection_yield_timeout", accelerate=0.3, brake=0.0, steer=0.0)
+                "intersection_yield_timeout", accelerate=0.3, brake=0.0, steer=0.0
+            )
             self.phase = 3
             self.phase_timer = 0.0
 
@@ -156,7 +160,8 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
             steer = 20.0 * gps_int
 
         self.root.blackboard.driving_action = DrivingAction(
-            "intersection_cross", accelerate=0.5, brake=0.0, steer=steer)
+            "intersection_cross", accelerate=0.5, brake=0.0, steer=steer
+        )
 
         # Terminar cuando el GPS deja de indicar giro fuerte
         if gps_int < 0.3:
@@ -178,8 +183,11 @@ class IntersectionHandler(py_trees.behaviour.Behaviour):
         mirror_dets = self.world.zones.get(mirror_name, [])
 
         # Vehículos en lateral o espejo
-        threats = [d for d in lateral_dets + mirror_dets
-                   if d.class_name in ("car", "truck", "bus", "motorcycle")]
+        threats = [
+            d
+            for d in lateral_dets + mirror_dets
+            if d.class_name in ("car", "truck", "bus", "motorcycle")
+        ]
 
         return len(threats) == 0
 

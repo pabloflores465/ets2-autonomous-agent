@@ -1,5 +1,6 @@
 import py_trees
-from src.decision.context import WorldContext, DrivingAction
+
+from src.decision.context import DrivingAction, WorldContext
 
 
 class Overtake(py_trees.behaviour.Behaviour):
@@ -18,10 +19,10 @@ class Overtake(py_trees.behaviour.Behaviour):
     No rebasa en curvas, intersecciones ni ciudad.
     """
 
-    OVERTAKE_SPEED = 85.0        # km/h durante rebase
-    LANE_CHANGE_STEER = 8.0       # grados para cambiar carril
-    MIN_FRONTAL_TIME = 2.0        # segundos mínimo con vehículo delante
-    CLEAR_DISTANCE = 100          # píxeles de margen lateral libre
+    OVERTAKE_SPEED = 85.0  # km/h durante rebase
+    LANE_CHANGE_STEER = 8.0  # grados para cambiar carril
+    MIN_FRONTAL_TIME = 2.0  # segundos mínimo con vehículo delante
+    CLEAR_DISTANCE = 100  # píxeles de margen lateral libre
 
     def __init__(self, name: str, world: WorldContext, config: dict = None):
         super().__init__(name)
@@ -39,6 +40,7 @@ class Overtake(py_trees.behaviour.Behaviour):
 
     def update(self) -> py_trees.common.Status:
         import time
+
         now = time.monotonic()
 
         if self.last_tick_time is None:
@@ -49,6 +51,7 @@ class Overtake(py_trees.behaviour.Behaviour):
 
         # Solo activar en autopista (GPS recto, alta intensidad de confianza)
         from src.perception.minimap import GPSDirection
+
         gps = self.world.gps_direction
         if gps != GPSDirection.STRAIGHT and self.phase == 0:
             return py_trees.common.Status.FAILURE
@@ -110,15 +113,16 @@ class Overtake(py_trees.behaviour.Behaviour):
                 self.phase = 6  # abortar, timeout
                 return py_trees.common.Status.RUNNING
             self.root.blackboard.driving_action = DrivingAction(
-                "overtake_wait", accelerate=0.3, brake=0.0, steer=0.0)
+                "overtake_wait", accelerate=0.3, brake=0.0, steer=0.0
+            )
             return py_trees.common.Status.RUNNING
 
     def _phase_change_left(self) -> py_trees.common.Status:
         """Cambiar al carril izquierdo."""
         # Steer suave a la izquierda
         self.root.blackboard.driving_action = DrivingAction(
-            "overtake_change_left", accelerate=0.8, brake=0.0,
-            steer=-self.LANE_CHANGE_STEER)
+            "overtake_change_left", accelerate=0.8, brake=0.0, steer=-self.LANE_CHANGE_STEER
+        )
 
         if self.phase_timer > 1.5:
             self.phase = 3
@@ -132,13 +136,15 @@ class Overtake(py_trees.behaviour.Behaviour):
         if self.world.obstacle_emergency:
             # ¡Peligro! Frenar
             self.root.blackboard.driving_action = DrivingAction(
-                "overtake_abort", accelerate=0.0, brake=1.0, steer=0.0)
+                "overtake_abort", accelerate=0.0, brake=1.0, steer=0.0
+            )
             self.phase = 6
             return py_trees.common.Status.RUNNING
 
         # Acelerar a fondo para pasar
         self.root.blackboard.driving_action = DrivingAction(
-            "overtake_passing", accelerate=1.0, brake=0.0, steer=0.0)
+            "overtake_passing", accelerate=1.0, brake=0.0, steer=0.0
+        )
 
         # Pasar cuando el vehículo ya no está en zona frontal
         # Y podemos verlo en espejo derecho (ya lo pasamos)
@@ -179,14 +185,15 @@ class Overtake(py_trees.behaviour.Behaviour):
                 self.phase_timer = 0.0
                 return py_trees.common.Status.RUNNING
             self.root.blackboard.driving_action = DrivingAction(
-                "overtake_wait_right", accelerate=0.5, brake=0.0, steer=0.0)
+                "overtake_wait_right", accelerate=0.5, brake=0.0, steer=0.0
+            )
             return py_trees.common.Status.RUNNING
 
     def _phase_return_right(self) -> py_trees.common.Status:
         """Retornar a carril derecho."""
         self.root.blackboard.driving_action = DrivingAction(
-            "overtake_return", accelerate=0.5, brake=0.0,
-            steer=self.LANE_CHANGE_STEER)
+            "overtake_return", accelerate=0.5, brake=0.0, steer=self.LANE_CHANGE_STEER
+        )
 
         if self.phase_timer > 1.5:
             self.phase = 6

@@ -4,7 +4,6 @@ Usa Metal Performance Shaders (MPS) en Apple Silicon.
 """
 
 import time
-from typing import List, Optional
 
 import numpy as np
 from ultralytics import YOLO
@@ -13,8 +12,7 @@ from ultralytics import YOLO
 class Detection:
     """Una detección individual."""
 
-    def __init__(self, class_id: int, class_name: str, confidence: float,
-                 bbox: np.ndarray):
+    def __init__(self, class_id: int, class_name: str, confidence: float, bbox: np.ndarray):
         self.class_id = class_id
         self.class_name = class_name
         self.confidence = confidence
@@ -27,8 +25,10 @@ class Detection:
         self.area = self.width * self.height
 
     def __repr__(self):
-        return (f"Detection({self.class_name}, conf={self.confidence:.2f}, "
-                f"bbox={self.bbox.astype(int).tolist()})")
+        return (
+            f"Detection({self.class_name}, conf={self.confidence:.2f}, "
+            f"bbox={self.bbox.astype(int).tolist()})"
+        )
 
 
 class YOLODetector:
@@ -44,15 +44,20 @@ class YOLODetector:
         11: "stop_sign",
     }
 
-    def __init__(self, model_path: str = "yolo11n.pt", device: str = "mps",
-                 confidence: float = 0.35, iou: float = 0.45):
+    def __init__(
+        self,
+        model_path: str = "yolo11n.pt",
+        device: str = "mps",
+        confidence: float = 0.35,
+        iou: float = 0.45,
+    ):
         self.model = YOLO(model_path)
         self.model.to(device)
         self.confidence = confidence
         self.iou = iou
         self._device = device
 
-    def detect(self, frame: np.ndarray) -> List[Detection]:
+    def detect(self, frame: np.ndarray) -> list[Detection]:
         """
         Ejecuta inferencia sobre un frame.
         Args:
@@ -60,8 +65,7 @@ class YOLODetector:
         Returns:
             Lista de Detection filtradas por clases de interés.
         """
-        results = self.model(frame, conf=self.confidence, iou=self.iou,
-                             verbose=False)
+        results = self.model(frame, conf=self.confidence, iou=self.iou, verbose=False)
         detections = []
 
         if len(results) == 0 or results[0].boxes is None:

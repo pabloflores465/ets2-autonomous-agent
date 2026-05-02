@@ -4,7 +4,6 @@ Captura la ventana de Parsec en macOS a 720p.
 """
 
 import time
-from typing import Optional, Tuple
 
 import mss
 import numpy as np

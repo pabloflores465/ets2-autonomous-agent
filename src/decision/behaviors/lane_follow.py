@@ -1,7 +1,8 @@
 import py_trees
-from src.decision.context import WorldContext, DrivingAction
-from src.perception.minimap import GPSDirection
+
+from src.decision.context import DrivingAction, WorldContext
 from src.perception.lane_detector import LaneType
+from src.perception.minimap import GPSDirection
 
 
 class LaneFollow(py_trees.behaviour.Behaviour):
@@ -14,8 +15,8 @@ class LaneFollow(py_trees.behaviour.Behaviour):
     LANE_WEIGHT = 0.4
     MAX_STEER = 25.0
 
-    CURVE_SPEED = 45.0         # km/h objetivo en curvas
-    STRAIGHT_SPEED = 70.0      # km/h objetivo en recta
+    CURVE_SPEED = 45.0  # km/h objetivo en curvas
+    STRAIGHT_SPEED = 70.0  # km/h objetivo en recta
 
     def __init__(self, name: str, world: WorldContext, config: dict = None):
         super().__init__(name)
@@ -46,14 +47,15 @@ class LaneFollow(py_trees.behaviour.Behaviour):
         speed = self._get_speed()
 
         if is_curving and speed > self.CURVE_SPEED:
-            accelerate = 0.0     # soltar en curva
+            accelerate = 0.0  # soltar en curva
         elif gps == GPSDirection.UNKNOWN:
-            accelerate = 0.3     # precaución si no hay GPS
+            accelerate = 0.3  # precaución si no hay GPS
         else:
-            accelerate = 0.7     # normal en recta
+            accelerate = 0.7  # normal en recta
 
         self.root.blackboard.driving_action = DrivingAction(
-            "lane_follow", accelerate=accelerate, brake=0.0, steer=steer)
+            "lane_follow", accelerate=accelerate, brake=0.0, steer=steer
+        )
 
         return py_trees.common.Status.SUCCESS
 

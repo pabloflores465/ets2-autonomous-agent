@@ -4,7 +4,6 @@ Usa optical flow (motion stop) + damage overlay (flash rojo en bordes).
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -13,11 +12,12 @@ import numpy as np
 @dataclass
 class CollisionInfo:
     """Información de colisión detectada."""
+
     collision_detected: bool
-    method: str                    # "optical_flow" | "red_flash" | "both" | "none"
-    motion_magnitude: float        # magnitud promedio del flujo óptico
-    red_flash_score: float         # proporción de bordes con rojo súbito
-    confidence: float              # 0.0 - 1.0
+    method: str  # "optical_flow" | "red_flash" | "both" | "none"
+    motion_magnitude: float  # magnitud promedio del flujo óptico
+    red_flash_score: float  # proporción de bordes con rojo súbito
+    confidence: float  # 0.0 - 1.0
 
 
 class CollisionDetector:
@@ -28,14 +28,14 @@ class CollisionDetector:
     """
 
     def __init__(self, config: dict = None):
-        self.prev_gray: Optional[np.ndarray] = None
+        self.prev_gray: np.ndarray | None = None
         self.motion_history: list = []
         self.motion_window = 5  # frames de historial
 
         # Umbrales
         self.motion_collapse_ratio = 0.30  # si el flujo cae al 30% del promedio → colisión
-        self.red_flash_threshold = 0.05    # 5% de bordes rojos = daño
-        self.border_width_pct = 0.10       # 10% del ancho/alto como borde
+        self.red_flash_threshold = 0.05  # 5% de bordes rojos = daño
+        self.border_width_pct = 0.10  # 10% del ancho/alto como borde
 
     def detect(self, frame: np.ndarray) -> CollisionInfo:
         """
@@ -50,10 +50,9 @@ class CollisionDetector:
 
         if self.prev_gray is not None:
             flow = cv2.calcOpticalFlowFarneback(
-                self.prev_gray, gray, None,
-                0.5, 3, 15, 3, 5, 1.2, 0
+                self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0
             )
-            mag = np.sqrt(flow[..., 0]**2 + flow[..., 1]**2)
+            mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
             motion_magnitude = float(np.mean(mag))
 
             # Historial de movimiento
@@ -77,27 +76,35 @@ class CollisionDetector:
         # --- Decisión ---
         if motion_collision and red_score > self.red_flash_threshold:
             return CollisionInfo(
-                collision_detected=True, method="both",
-                motion_magnitude=motion_magnitude, red_flash_score=red_score,
-                confidence=min(1.0, (red_score * 10 + (1.0 if motion_collision else 0)) / 2)
+                collision_detected=True,
+                method="both",
+                motion_magnitude=motion_magnitude,
+                red_flash_score=red_score,
+                confidence=min(1.0, (red_score * 10 + (1.0 if motion_collision else 0)) / 2),
             )
         elif motion_collision:
             return CollisionInfo(
-                collision_detected=True, method="optical_flow",
-                motion_magnitude=motion_magnitude, red_flash_score=red_score,
-                confidence=0.7
+                collision_detected=True,
+                method="optical_flow",
+                motion_magnitude=motion_magnitude,
+                red_flash_score=red_score,
+                confidence=0.7,
             )
         elif red_score > self.red_flash_threshold:
             return CollisionInfo(
-                collision_detected=True, method="red_flash",
-                motion_magnitude=motion_magnitude, red_flash_score=red_score,
-                confidence=0.6
+                collision_detected=True,
+                method="red_flash",
+                motion_magnitude=motion_magnitude,
+                red_flash_score=red_score,
+                confidence=0.6,
             )
 
         return CollisionInfo(
-            collision_detected=False, method="none",
-            motion_magnitude=motion_magnitude, red_flash_score=red_score,
-            confidence=0.0
+            collision_detected=False,
+            method="none",
+            motion_magnitude=motion_magnitude,
+            red_flash_score=red_score,
+            confidence=0.0,
         )
 
     def _detect_red_flash(self, frame: np.ndarray) -> float:
@@ -106,15 +113,30 @@ class CollisionDetector:
         bw = int(w * self.border_width_pct)
         bh = int(h * self.border_width_pct)
 
-        # Extraer bordes: top, bottom, left, right
-        borders = np.concatenate([
-            frame[0:bh, :].reshape(-1, 3),         # top
-            frame[h-bh:h, :].reshape(-1, 3),       # bottom
-            frame[bh:h-bh, 0:bw].reshape(-1, 3),   # left
-            frame[bh:h-bh, w-bw:w].reshape(-1, 3), # right
-        ])
+        # Extraer bordes como lista de píxeles
+        border_pixels = []
+        # Top
+        if bh > 0:
+            border_pixels.append(frame[0:bh, :].reshape(-1, 3))
+        # Bottom
+        if bh > 0:
+            border_pixels.append(frame[h - bh : h, :].reshape(-1, 3))
+        # Left
+        if bw > 0 and (h - 2 * bh) > 0:
+            border_pixels.append(frame[bh : h - bh, 0:bw].reshape(-1, 3))
+        # Right
+        if bw > 0 and (h - 2 * bh) > 0:
+            border_pixels.append(frame[bh : h - bh, w - bw : w].reshape(-1, 3))
 
-        hsv = cv2.cvtColor(borders.reshape(1, -1, 3), cv2.COLOR_BGR2HSV)
+        if not border_pixels:
+            return 0.0
+
+        borders = np.concatenate(border_pixels)
+
+        # Convertir a HSV para detectar rojo
+        # reshape a (N, 1, 3) para cvtColor
+        borders_reshaped = borders.reshape(-1, 1, 3).astype(np.uint8)
+        hsv = cv2.cvtColor(borders_reshaped, cv2.COLOR_BGR2HSV)
         hsv = hsv.reshape(-1, 3)
 
         # Rojo intenso (daño)

@@ -4,7 +4,6 @@ Para cada bbox de traffic_light, determina el estado (RED/YELLOW/GREEN).
 """
 
 from enum import Enum
-from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -25,8 +24,7 @@ class TrafficLightClassifier:
     def __init__(self, config: dict):
         cfg = config["perception"]["traffic_light"]
         self.red_ranges = [
-            (np.array([h[0], cfg["saturation_min"], cfg["value_min"]]),
-             np.array([h[1], 255, 255]))
+            (np.array([h[0], cfg["saturation_min"], cfg["value_min"]]), np.array([h[1], 255, 255]))
             for h in cfg["red_hue_ranges"]
         ]
         self.yellow_range = (

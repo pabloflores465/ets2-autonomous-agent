@@ -1,5 +1,6 @@
 import py_trees
-from src.decision.context import WorldContext, DrivingAction
+
+from src.decision.context import DrivingAction, WorldContext
 
 
 class Cruise(py_trees.behaviour.Behaviour):
@@ -11,9 +12,9 @@ class Cruise(py_trees.behaviour.Behaviour):
       - Prioriza estabilidad sobre velocidad
     """
 
-    CRUISE_SPEED = 70.0       # km/h objetivo en recta
-    MAX_SPEED = 85.0           # km/h máximo (el camión limita a 90)
-    CURVE_SPEED = 45.0         # km/h en curvas
+    CRUISE_SPEED = 70.0  # km/h objetivo en recta
+    MAX_SPEED = 85.0  # km/h máximo (el camión limita a 90)
+    CURVE_SPEED = 45.0  # km/h en curvas
 
     def __init__(self, name: str, world: WorldContext, config: dict = None):
         super().__init__(name)
@@ -34,7 +35,8 @@ class Cruise(py_trees.behaviour.Behaviour):
             accelerate = 1.0  # arranque: acelerar a fondo
 
         self.root.blackboard.driving_action = DrivingAction(
-            "cruise", accelerate=accelerate, brake=0.0, steer=0.0)
+            "cruise", accelerate=accelerate, brake=0.0, steer=0.0
+        )
 
         return py_trees.common.Status.SUCCESS
 

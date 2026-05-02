@@ -3,30 +3,30 @@ Detección de carriles mediante CV clásico (Canny + HoughLinesP).
 Con fallback para caminos de terracería sin líneas pintadas.
 """
 
-from enum import Enum
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from enum import Enum
 
 import cv2
 import numpy as np
 
 
 class LaneType(Enum):
-    PAINTED = "painted"         # Líneas de carril detectadas
-    DIRT = "dirt"               # Terracería, sin líneas
+    PAINTED = "painted"  # Líneas de carril detectadas
+    DIRT = "dirt"  # Terracería, sin líneas
     UNKNOWN = "unknown"
 
 
 @dataclass
 class LaneInfo:
     """Información de carril detectado."""
+
     lane_type: LaneType
-    offset_px: float            # Desplazamiento lateral desde centro (px)
-    offset_norm: float          # -1.0 (izq total) a 1.0 (der total)
-    angle_deg: float             # Ángulo de las líneas respecto a vertical
-    confidence: float           # 0.0 - 1.0
-    left_line: Optional[np.ndarray] = None
-    right_line: Optional[np.ndarray] = None
+    offset_px: float  # Desplazamiento lateral desde centro (px)
+    offset_norm: float  # -1.0 (izq total) a 1.0 (der total)
+    angle_deg: float  # Ángulo de las líneas respecto a vertical
+    confidence: float  # 0.0 - 1.0
+    left_line: np.ndarray | None = None
+    right_line: np.ndarray | None = None
 
 
 class LaneDetector:
@@ -48,12 +48,12 @@ class LaneDetector:
         self.hough_max_line_gap = 40
 
         # Región de interés (mitad inferior del frame frontal)
-        self.roi_top_pct = 0.55   # desde 55% de altura
+        self.roi_top_pct = 0.55  # desde 55% de altura
         self.roi_bottom_pct = 0.95
 
         # Umbrales
         self.min_lines_for_painted = 2
-        self.expected_lane_width_px = 300   # ancho típico de carril a 720p
+        self.expected_lane_width_px = 300  # ancho típico de carril a 720p
 
     def detect(self, frame: np.ndarray) -> LaneInfo:
         """
@@ -91,12 +91,12 @@ class LaneDetector:
 
         return self._analyze_lines(lines, h, w, roi_y1)
 
-    def _analyze_lines(self, lines: np.ndarray, frame_h: int,
-                       frame_w: int, roi_y1: int) -> LaneInfo:
+    def _analyze_lines(
+        self, lines: np.ndarray, frame_h: int, frame_w: int, roi_y1: int
+    ) -> LaneInfo:
         """Clasifica líneas en izquierda/derecha y calcula offset."""
         left_lines = []
         right_lines = []
-        center_x = frame_w / 2
 
         for line in lines:
             x1, y1, x2, y2 = line[0]
@@ -110,7 +110,7 @@ class LaneDetector:
 
             # Línea izquierda: pendiente negativa (en sistema imagen)
             # Línea derecha: pendiente positiva
-            mid_x = (x1 + x2) / 2
+            (x1 + x2) / 2
             if slope < 0:
                 left_lines.append(line[0])
             else:
@@ -153,8 +153,7 @@ class LaneDetector:
             right_line=np.array(right_avg) if right_avg is not None else None,
         )
 
-    def _average_line(self, lines: List, frame_h: int,
-                      frame_w: int) -> Optional[Tuple]:
+    def _average_line(self, lines: list, frame_h: int, frame_w: int) -> tuple | None:
         """Promedia una lista de líneas en una sola línea extendida."""
         if not lines:
             return None
@@ -181,9 +180,9 @@ class LaneDetector:
 
         return (x1_avg, y1_avg, x2_avg, y2_avg)
 
-    def _calculate_offset(self, left_line: Optional[Tuple],
-                          right_line: Optional[Tuple],
-                          frame_w: int) -> float:
+    def _calculate_offset(
+        self, left_line: tuple | None, right_line: tuple | None, frame_w: int
+    ) -> float:
         """Calcula offset desde el centro del carril."""
         center_x = frame_w / 2
 
@@ -226,22 +225,26 @@ class LaneDetector:
 
         if lane_info.left_line is not None:
             x1, y1, x2, y2 = lane_info.left_line
-            cv2.line(vis, (x1, y1 + roi_y1), (x2, y2 + roi_y1),
-                     (255, 0, 0), 3)
+            cv2.line(vis, (x1, y1 + roi_y1), (x2, y2 + roi_y1), (255, 0, 0), 3)
         if lane_info.right_line is not None:
             x1, y1, x2, y2 = lane_info.right_line
-            cv2.line(vis, (x1, y1 + roi_y1), (x2, y2 + roi_y1),
-                     (0, 0, 255), 3)
+            cv2.line(vis, (x1, y1 + roi_y1), (x2, y2 + roi_y1), (0, 0, 255), 3)
 
         # Centro
         center_x = w // 2
-        cv2.line(vis, (center_x, h), (center_x, int(h * 0.5)),
-                 (0, 255, 255), 1)
+        cv2.line(vis, (center_x, h), (center_x, int(h * 0.5)), (0, 255, 255), 1)
 
         # Offset text
-        cv2.putText(vis, f"Lane: {lane_info.lane_type.value} "
-                    f"offset={lane_info.offset_px:.0f}px "
-                    f"conf={lane_info.confidence:.1f}",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+        cv2.putText(
+            vis,
+            f"Lane: {lane_info.lane_type.value} "
+            f"offset={lane_info.offset_px:.0f}px "
+            f"conf={lane_info.confidence:.1f}",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 0),
+            1,
+        )
 
         return vis

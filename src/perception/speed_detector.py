@@ -5,7 +5,6 @@ Método secundario: optical flow (magnitud promedio entre frames).
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -14,9 +13,10 @@ import numpy as np
 @dataclass
 class SpeedInfo:
     """Información de velocidad estimada."""
-    speed_kmh: float            # velocidad en km/h
-    method: str                 # "ocr" | "optical_flow" | "none"
-    confidence: float           # 0.0 - 1.0
+
+    speed_kmh: float  # velocidad en km/h
+    method: str  # "ocr" | "optical_flow" | "none"
+    confidence: float  # 0.0 - 1.0
 
 
 class SpeedDetector:
@@ -34,7 +34,7 @@ class SpeedDetector:
         self.roi_y2_pct = 0.92
 
         # Optical flow (fallback)
-        self.prev_gray: Optional[np.ndarray] = None
+        self.prev_gray: np.ndarray | None = None
         self.flow_scale = 50.0  # factor de conversión flujo → km/h (requiere calibración)
         self.flow_history = []
         self.flow_window = 5
@@ -51,12 +51,11 @@ class SpeedDetector:
         # Fallback: optical flow
         speed_flow = self._optical_flow_speed(frame_bgr)
         if speed_flow is not None:
-            return SpeedInfo(speed_kmh=speed_flow, method="optical_flow",
-                             confidence=0.5)
+            return SpeedInfo(speed_kmh=speed_flow, method="optical_flow", confidence=0.5)
 
         return SpeedInfo(speed_kmh=0.0, method="none", confidence=0.0)
 
-    def _ocr_speed(self, frame_bgr: np.ndarray) -> Optional[float]:
+    def _ocr_speed(self, frame_bgr: np.ndarray) -> float | None:
         """
         Detecta dígitos del velocímetro digital usando CV simple.
         El display LCD de ETS2 muestra números blancos/grises sobre fondo oscuro.
@@ -78,8 +77,7 @@ class SpeedDetector:
         # Binarizar: asumimos dígitos claros sobre fondo oscuro
         # Umbral adaptativo
         thresh = cv2.adaptiveThreshold(
-            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY, 15, 5
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 5
         )
 
         # Invertir si necesario (queremos texto blanco sobre negro)
@@ -87,8 +85,7 @@ class SpeedDetector:
             thresh = 255 - thresh
 
         # Encontrar contornos que podrían ser dígitos
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
-                                        cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Filtrar contornos con forma de dígito (alto > ancho)
         digit_candidates = []
@@ -96,11 +93,9 @@ class SpeedDetector:
             x, y, cw, ch = cv2.boundingRect(cnt)
             aspect_ratio = ch / cw if cw > 0 else 0
             area = cw * ch
-            roi_area = (x2 - x1) * (y2 - y1)
+            (x2 - x1) * (y2 - y1)
             # Dígito: alto 30-80% de ROI, aspect ratio ~1.5-3.0
-            if (0.15 * (y2 - y1) < ch < 0.8 * (y2 - y1) and
-                    1.2 < aspect_ratio < 4.0 and
-                    area > 50):
+            if 0.15 * (y2 - y1) < ch < 0.8 * (y2 - y1) and 1.2 < aspect_ratio < 4.0 and area > 50:
                 digit_candidates.append((x, cnt))
 
         if not digit_candidates:
@@ -116,8 +111,7 @@ class SpeedDetector:
 
         return None
 
-    def _match_digits(self, thresh: np.ndarray,
-                      candidates: list) -> Optional[str]:
+    def _match_digits(self, thresh: np.ndarray, candidates: list) -> str | None:
         """
         Intenta reconocer dígitos usando template matching simple.
         Generamos templates 0-9 en la misma escala.
@@ -128,7 +122,7 @@ class SpeedDetector:
         result = []
         for _, cnt in candidates:
             x, y, w, h = cv2.boundingRect(cnt)
-            digit_img = thresh[y:y + h, x:x + w]
+            digit_img = thresh[y : y + h, x : x + w]
 
             # Normalizar tamaño
             digit_img = cv2.resize(digit_img, (20, 35))
@@ -138,9 +132,9 @@ class SpeedDetector:
             if best_score > 0.4:  # umbral de confianza
                 result.append(str(best_digit))
 
-        return ''.join(result) if result else None
+        return "".join(result) if result else None
 
-    def _classify_digit(self, digit_img: np.ndarray) -> Tuple[int, float]:
+    def _classify_digit(self, digit_img: np.ndarray) -> tuple[int, float]:
         """
         Clasifica un dígito comparando con templates sintéticos.
         Returns (digit, score).
@@ -183,7 +177,7 @@ class SpeedDetector:
         }
 
         best_digit = 0
-        best_dist = float('inf')
+        best_dist = float("inf")
         for digit, ref in ref_moments.items():
             dist = np.linalg.norm(moments[:7] - ref)
             if dist < best_dist:
@@ -194,7 +188,7 @@ class SpeedDetector:
         score = max(0.0, 1.0 - best_dist / 2.0)
         return best_digit, score
 
-    def _optical_flow_speed(self, frame_bgr: np.ndarray) -> Optional[float]:
+    def _optical_flow_speed(self, frame_bgr: np.ndarray) -> float | None:
         """
         Estima velocidad por optical flow (magnitud de movimiento).
         """
@@ -204,10 +198,8 @@ class SpeedDetector:
             self.prev_gray = gray
             return None
 
-        flow = cv2.calcOpticalFlowFarneback(
-            self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0
-        )
-        mag = np.sqrt(flow[..., 0]**2 + flow[..., 1]**2)
+        flow = cv2.calcOpticalFlowFarneback(self.prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+        mag = np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2)
         avg_mag = float(np.mean(mag))
 
         self.prev_gray = gray

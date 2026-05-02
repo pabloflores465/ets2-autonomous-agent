@@ -8,7 +8,6 @@ Elementos del minimapa:
 """
 
 from enum import Enum
-from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -27,11 +26,13 @@ class MinimapProcessor:
     def __init__(self, config: dict):
         cfg = config["perception"]["minimap"]["roi"]
         self.roi_pct = (
-            cfg["left_pct"], cfg["top_pct"],
-            cfg["right_pct"], cfg["bottom_pct"],
+            cfg["left_pct"],
+            cfg["top_pct"],
+            cfg["right_pct"],
+            cfg["bottom_pct"],
         )
 
-    def process(self, frame: np.ndarray) -> Tuple[GPSDirection, float, Tuple[float, float]]:
+    def process(self, frame: np.ndarray) -> tuple[GPSDirection, float, tuple[float, float]]:
         """
         Procesa el minimapa.
         Args:
@@ -53,7 +54,7 @@ class MinimapProcessor:
         truck_center = self._detect_truck_arrow(roi)
         return direction, intensity, truck_center
 
-    def _analyze_route(self, roi: np.ndarray) -> Tuple[GPSDirection, float]:
+    def _analyze_route(self, roi: np.ndarray) -> tuple[GPSDirection, float]:
         """
         Detecta línea roja y calcula dirección.
         Steps:
@@ -85,8 +86,7 @@ class MinimapProcessor:
         skeleton = self._skeletonize(red_mask)
 
         # Encontrar contornos principales
-        contours, _ = cv2.findContours(skeleton, cv2.RETR_EXTERNAL,
-                                        cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(skeleton, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return GPSDirection.UNKNOWN, 0.0
 
@@ -138,7 +138,7 @@ class MinimapProcessor:
                 done = True
         return skeleton
 
-    def _detect_truck_arrow(self, roi: np.ndarray) -> Tuple[float, float]:
+    def _detect_truck_arrow(self, roi: np.ndarray) -> tuple[float, float]:
         """
         Detecta la flecha azul del camión en el minimapa.
         Returns:
@@ -157,8 +157,7 @@ class MinimapProcessor:
         blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_OPEN, kernel)
         blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_CLOSE, kernel)
 
-        contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL,
-                                        cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return (0.5, 0.5)  # centro por defecto
 
@@ -170,10 +169,10 @@ class MinimapProcessor:
             roi_area = w * h
             # La flecha del camión ocupa ~2-8% del minimapa
             if 0.005 * roi_area < area < 0.12 * roi_area:
-                M = cv2.moments(cnt)
-                if M["m00"] > 0:
-                    cx = M["m10"] / M["m00"]
-                    cy = M["m01"] / M["m00"]
+                moments = cv2.moments(cnt)
+                if moments["m00"] > 0:
+                    cx = moments["m10"] / moments["m00"]
+                    cy = moments["m01"] / moments["m00"]
                     candidates.append((area, cx, cy))
 
         if candidates:
@@ -183,7 +182,7 @@ class MinimapProcessor:
 
         return (0.5, 0.5)
 
-    def get_roi_coords(self, frame_shape: Tuple[int, int, int]) -> Tuple[int, int, int, int]:
+    def get_roi_coords(self, frame_shape: tuple[int, int, int]) -> tuple[int, int, int, int]:
         """Devuelve coordenadas de la ROI del minimapa."""
         h, w = frame_shape[:2]
         return (

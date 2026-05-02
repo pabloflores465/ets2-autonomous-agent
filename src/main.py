@@ -8,26 +8,29 @@ import os
 import sys
 import time
 
-import yaml
 import cv2
 import pyautogui
+import yaml
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
-from src.capture.screen_grabber import ScreenGrabber
-from src.perception.detector import YOLODetector
-from src.perception.zones import ZoneAssigner
-from src.perception.traffic_light_classifier import TrafficLightClassifier
-from src.perception.minimap import MinimapProcessor
-from src.perception.lane_detector import LaneDetector
-from src.perception.collision_detector import CollisionDetector
-from src.perception.speed_detector import SpeedDetector
-from src.decision.context import WorldContext
-from src.decision.behavior_tree import build_behavior_tree, get_active_action
-from src.actuation.controller import Controller
-from src.utils.logger import SessionLogger, CycleMetrics
-from src.utils.visualizer import DebugVisualizer
+# fmt: off
+# ruff: noqa: I001
+from src.actuation.controller import Controller  # noqa: E402
+from src.capture.screen_grabber import ScreenGrabber  # noqa: E402
+from src.decision.behavior_tree import build_behavior_tree, get_active_action  # noqa: E402
+from src.decision.context import WorldContext  # noqa: E402
+from src.perception.collision_detector import CollisionDetector  # noqa: E402
+from src.perception.detector import YOLODetector  # noqa: E402
+from src.perception.lane_detector import LaneDetector  # noqa: E402
+from src.perception.minimap import MinimapProcessor  # noqa: E402
+from src.perception.speed_detector import SpeedDetector  # noqa: E402
+from src.perception.traffic_light_classifier import TrafficLightClassifier  # noqa: E402
+from src.perception.zones import ZoneAssigner  # noqa: E402
+from src.utils.logger import CycleMetrics, SessionLogger  # noqa: E402
+from src.utils.visualizer import DebugVisualizer  # noqa: E402
+# fmt: on
 
 
 class ETS2Agent:
@@ -44,8 +47,10 @@ class ETS2Agent:
         # Módulos
         self.grabber = ScreenGrabber(self.config)
         self.detector = YOLODetector(
-            model_path=perc["model"], device=perc["device"],
-            confidence=perc["confidence"], iou=perc["iou"],
+            model_path=perc["model"],
+            device=perc["device"],
+            confidence=perc["confidence"],
+            iou=perc["iou"],
         )
         self.zones = ZoneAssigner(self.config, self.grabber.width, self.grabber.height)
         self.light_classifier = TrafficLightClassifier(self.config)
@@ -125,8 +130,10 @@ class ETS2Agent:
 
             # ── Contexto ──
             self.world.update(
-                detections=detections, zones=zones,
-                gps_direction=gps_dir, gps_intensity=gps_int,
+                detections=detections,
+                zones=zones,
+                gps_direction=gps_dir,
+                gps_intensity=gps_int,
                 truck_minimap_xy=truck_xy,
                 traffic_light_state=tl_state,
                 lane_info=lane_info,
@@ -148,21 +155,26 @@ class ETS2Agent:
             # ── Actuación ──
             t_act = time.perf_counter()
             cam_look = getattr(self.bt.root.blackboard, "camera_look_angle", 0.0)
-            self.controller.execute(action, duration_ms=50, reverse_requested=reverse_req,
-                                    camera_look_angle=cam_look)
+            self.controller.execute(
+                action, duration_ms=50, reverse_requested=reverse_req, camera_look_angle=cam_look
+            )
             act_ms = (time.perf_counter() - t_act) * 1000
 
             # ── Métricas ──
             total_ms = (time.perf_counter() - t_start) * 1000
             over = total_ms > self.frame_budget_ms
             metrics = CycleMetrics(
-                timestamp=time.time(), frame_id=self.frame_id,
+                timestamp=time.time(),
+                frame_id=self.frame_id,
                 fps=1000.0 / total_ms if total_ms > 0 else 0,
-                capture_ms=0, inference_ms=per_ms,
-                decision_ms=dec_ms, actuation_ms=act_ms,
+                capture_ms=0,
+                inference_ms=per_ms,
+                decision_ms=dec_ms,
+                actuation_ms=act_ms,
                 total_ms=total_ms,
                 detections_count=len(detections),
-                active_behavior=action.behavior, action=str(action),
+                active_behavior=action.behavior,
+                action=str(action),
                 confidence_sum=sum(d.confidence for d in detections),
                 over_budget=over,
             )
@@ -172,25 +184,29 @@ class ETS2Agent:
             if self.visualizer.enabled and self.frame_id % 2 == 0:
                 self.visualizer.log_detections(detections, zones)
                 key = self.visualizer.show(
-                    frame=frame_bgr, bgr_frame=frame_bgr,
-                    detections=detections, zones=zones,
+                    frame=frame_bgr,
+                    bgr_frame=frame_bgr,
+                    detections=detections,
+                    zones=zones,
                     zone_assigner=self.zones,
-                    lane_info=lane_info, lane_detector=self.lane_detector,
+                    lane_info=lane_info,
+                    lane_detector=self.lane_detector,
                     minimap_proc=self.minimap,
-                    behavior=action.behavior, action_str=str(action),
-                    fps=metrics.fps, total_ms=total_ms,
+                    behavior=action.behavior,
+                    action_str=str(action),
+                    fps=metrics.fps,
+                    total_ms=total_ms,
                     frame_id=self.frame_id,
                     traffic_light=tl_state or "none",
                     gps_direction=gps_dir.value if gps_dir else "unknown",
-                    collision=(collision_info.collision_detected
-                               if collision_info else False),
+                    collision=(collision_info.collision_detected if collision_info else False),
                 )
                 # Controles de teclado en ventana
-                if key in (ord('p'), ord(' ')):
+                if key in (ord("p"), ord(" ")):
                     self.paused = not self.paused
                     state = "PAUSED" if self.paused else "RESUMED"
                     self.logger.log_event("INFO", f"Agent {state}")
-                elif key == ord('q'):
+                elif key == ord("q"):
                     self.logger.log_event("INFO", "Stopped via window")
                     self.running = False
 
@@ -199,8 +215,7 @@ class ETS2Agent:
             if elapsed < self.frame_budget_ms:
                 time.sleep((self.frame_budget_ms - elapsed) / 1000)
             else:
-                self.logger.log_event("WARN",
-                    f"F{self.frame_id} over budget: {elapsed:.0f}ms")
+                self.logger.log_event("WARN", f"F{self.frame_id} over budget: {elapsed:.0f}ms")
 
             self.frame_id += 1
 
@@ -221,11 +236,18 @@ class ETS2Agent:
         overlay = vis.copy()
         cv2.rectangle(overlay, (0, 0), (w, h), (0, 0, 0), -1)
         cv2.addWeighted(vis, 0.4, overlay, 0.6, 0, vis)
-        cv2.putText(vis, "⏸ PAUSED", (w // 2 - 100, h // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 3)
-        cv2.putText(vis, "P/Space = resume | Q = quit",
-                    (w // 2 - 160, h // 2 + 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(
+            vis, "⏸ PAUSED", (w // 2 - 100, h // 2), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 3
+        )
+        cv2.putText(
+            vis,
+            "P/Space = resume | Q = quit",
+            (w // 2 - 160, h // 2 + 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 255, 255),
+            1,
+        )
         cv2.imshow(self.visualizer.window_name, vis)
         cv2.waitKey(1)
 

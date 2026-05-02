@@ -1,5 +1,6 @@
 import py_trees
-from src.decision.context import WorldContext, DrivingAction
+
+from src.decision.context import DrivingAction, WorldContext
 
 
 class CollisionRecovery(py_trees.behaviour.Behaviour):
@@ -12,13 +13,13 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
     4. AVANZAR de nuevo
     """
 
-    REVERSE_DURATION_S = 2.0     # segundos en reverse
+    REVERSE_DURATION_S = 2.0  # segundos en reverse
     STEER_CORRECTION_DEG = 20.0  # grados de corrección
 
     def __init__(self, name: str, world: WorldContext, config: dict = None):
         super().__init__(name)
         self.world = world
-        self.phase = 0           # 0=brake, 1=wait, 2=reverse, 3=done
+        self.phase = 0  # 0=brake, 1=wait, 2=reverse, 3=done
         self.phase_timer = 0.0
         self.last_tick_time = None
 
@@ -28,6 +29,7 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
 
     def update(self) -> py_trees.common.Status:
         import time
+
         now = time.monotonic()
 
         # Solo activar si hay colisión detectada
@@ -49,8 +51,7 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
         if self.phase == 0:
             # Frenar fuerte
             self.root.blackboard.driving_action = DrivingAction(
-                "collision_brake", accelerate=0.0, brake=1.0, steer=0.0,
-                handbrake=True
+                "collision_brake", accelerate=0.0, brake=1.0, steer=0.0, handbrake=True
             )
             if self.phase_timer > 0.5:
                 self.phase = 1
@@ -60,8 +61,7 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
         elif self.phase == 1:
             # Esperar estabilización
             self.root.blackboard.driving_action = DrivingAction(
-                "collision_wait", accelerate=0.0, brake=0.0, steer=0.0,
-                handbrake=False
+                "collision_wait", accelerate=0.0, brake=0.0, steer=0.0, handbrake=False
             )
             if self.phase_timer > 1.0:
                 self.phase = 2
@@ -72,14 +72,12 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
             # Reverse + corregir dirección según GPS
             steer = self._get_reverse_steer()
             action = DrivingAction(
-                "collision_reverse", accelerate=0.0, brake=0.0,
-                steer=steer, handbrake=False
+                "collision_reverse", accelerate=0.0, brake=0.0, steer=steer, handbrake=False
             )
             # Simular reverse: brake key es S, pero reverse es otra tecla
             # Marcamos en el blackboard que queremos reverse
             action = DrivingAction(
-                "collision_reverse", accelerate=0.0, brake=0.0,
-                steer=steer, handbrake=False
+                "collision_reverse", accelerate=0.0, brake=0.0, steer=steer, handbrake=False
             )
             setattr(self.root.blackboard, "reverse_requested", True)
             self.root.blackboard.driving_action = action
@@ -104,6 +102,7 @@ class CollisionRecovery(py_trees.behaviour.Behaviour):
         orientar el camión hacia la ruta.
         """
         from src.perception.minimap import GPSDirection
+
         gps = self.world.gps_direction
         intensity = self.world.gps_intensity
 

@@ -33,9 +33,13 @@ class Controller:
         self._reverse_pressed = False
         self._camera_look_angle = 0.0
 
-    def execute(self, action: DrivingAction, duration_ms: int = 50,
-                reverse_requested: bool = False,
-                camera_look_angle: float = 0.0):
+    def execute(
+        self,
+        action: DrivingAction,
+        duration_ms: int = 50,
+        reverse_requested: bool = False,
+        camera_look_angle: float = 0.0,
+    ):
         """Ejecuta una acción de conducción."""
         # Camera look tiene prioridad sobre steering
         if camera_look_angle != self._camera_look_angle:
@@ -109,15 +113,16 @@ class Controller:
         if abs(dx) > 0:
             pyautogui.moveRel(dx, 0, duration=duration_ms / 1000)
         else:
-            pyautogui.moveTo(self.center_x, self.center_y,
-                             duration=duration_ms / 1000)
+            pyautogui.moveTo(self.center_x, self.center_y, duration=duration_ms / 1000)
         self._current_steer = angle
 
     def emergency_stop(self):
         """Suelta todas las teclas y aplica freno de mano."""
-        for key, flag in [(self.accel_key, '_accel_pressed'),
-                           (self.brake_key, '_brake_pressed'),
-                           (self.reverse_key, '_reverse_pressed')]:
+        for key, flag in [
+            (self.accel_key, "_accel_pressed"),
+            (self.brake_key, "_brake_pressed"),
+            (self.reverse_key, "_reverse_pressed"),
+        ]:
             if getattr(self, flag):
                 pyautogui.keyUp(key)
                 setattr(self, flag, False)

@@ -6,16 +6,14 @@ Muestra en ventanas OpenCV:
   - Panel de estado (comportamiento activo, métricas)
 """
 
-from typing import List, Dict, Optional
 
 import cv2
 import numpy as np
 
 from src.perception.detector import Detection
-from src.perception.zones import ZoneAssigner, draw_zones
-from src.perception.lane_detector import LaneInfo, LaneDetector
+from src.perception.lane_detector import LaneDetector, LaneInfo
 from src.perception.minimap import MinimapProcessor
-
+from src.perception.zones import ZoneAssigner, draw_zones
 
 # Colores por clase
 CLASS_COLORS = {
@@ -46,21 +44,25 @@ class DebugVisualizer:
         # Posiciones de ventanas
         self._window_created = False
 
-    def show(self, frame: np.ndarray, bgr_frame: np.ndarray,
-             detections: List[Detection],
-             zones: Dict[str, List[Detection]],
-             zone_assigner: ZoneAssigner,
-             lane_info: Optional[LaneInfo],
-             lane_detector: LaneDetector,
-             minimap_proc: MinimapProcessor,
-             behavior: str,
-             action_str: str,
-             fps: float,
-             total_ms: float,
-             frame_id: int,
-             traffic_light: str = "none",
-             gps_direction: str = "unknown",
-             collision: bool = False):
+    def show(
+        self,
+        frame: np.ndarray,
+        bgr_frame: np.ndarray,
+        detections: list[Detection],
+        zones: dict[str, list[Detection]],
+        zone_assigner: ZoneAssigner,
+        lane_info: LaneInfo | None,
+        lane_detector: LaneDetector,
+        minimap_proc: MinimapProcessor,
+        behavior: str,
+        action_str: str,
+        fps: float,
+        total_ms: float,
+        frame_id: int,
+        traffic_light: str = "none",
+        gps_direction: str = "unknown",
+        collision: bool = False,
+    ):
         """Renderiza todas las visualizaciones."""
         if not self.enabled:
             return
@@ -77,8 +79,7 @@ class DebugVisualizer:
             color = CLASS_COLORS.get(det.class_name, (128, 128, 128))
             cv2.rectangle(vis, (x1, y1), (x2, y2), color, 2)
             label = f"{det.class_name} {det.confidence:.2f}"
-            cv2.putText(vis, label, (x1, y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+            cv2.putText(vis, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
 
         # Dibujar carriles
         if lane_detector is not None and lane_info is not None:
@@ -91,17 +92,36 @@ class DebugVisualizer:
         cv2.rectangle(overlay, (0, 0), (w, 80), (0, 0, 0), -1)
         vis = cv2.addWeighted(vis, 0.7, overlay, 0.3, 0)
 
-        cv2.putText(vis, f"FPS: {fps:.1f} | Frame: {frame_id} | "
-                    f"Total: {total_ms:.0f}ms | "
-                    f"Behavior: {behavior}",
-                    (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        cv2.putText(vis, f"GPS: {gps_direction} | "
-                    f"Light: {traffic_light} | "
-                    f"Dets: {len(detections)} | "
-                    f"Collision: {'YES' if collision else 'no'}",
-                    (10, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        cv2.putText(vis, f"Action: {action_str}",
-                    (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+        cv2.putText(
+            vis,
+            f"FPS: {fps:.1f} | Frame: {frame_id} | Total: {total_ms:.0f}ms | Behavior: {behavior}",
+            (10, 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
+        cv2.putText(
+            vis,
+            f"GPS: {gps_direction} | "
+            f"Light: {traffic_light} | "
+            f"Dets: {len(detections)} | "
+            f"Collision: {'YES' if collision else 'no'}",
+            (10, 45),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
+        cv2.putText(
+            vis,
+            f"Action: {action_str}",
+            (10, 70),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.4,
+            (200, 200, 200),
+            1,
+        )
 
         cv2.imshow(self.window_name, vis)
 
@@ -120,13 +140,16 @@ class DebugVisualizer:
 
         # Non-blocking wait
         key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
+        if key == ord("q"):
             print("\n[VISUALIZER] Q pressed - requesting stop")
         return key
 
-    def _render_minimap(self, frame_bgr: np.ndarray,
-                        minimap_proc: MinimapProcessor,
-                        zones: Dict[str, List[Detection]]) -> Optional[np.ndarray]:
+    def _render_minimap(
+        self,
+        frame_bgr: np.ndarray,
+        minimap_proc: MinimapProcessor,
+        zones: dict[str, list[Detection]],
+    ) -> np.ndarray | None:
         """Renderiza el minimapa con overlay de procesamiento."""
         h, w = frame_bgr.shape[:2]
         x1, y1, x2, y2 = minimap_proc.get_roi_coords(frame_bgr.shape)
@@ -137,8 +160,7 @@ class DebugVisualizer:
         roi = frame_bgr[y1:y2, x1:x2].copy()
 
         # Dibujar borde
-        cv2.rectangle(roi, (0, 0), (roi.shape[1]-1, roi.shape[0]-1),
-                      (0, 255, 255), 2)
+        cv2.rectangle(roi, (0, 0), (roi.shape[1] - 1, roi.shape[0] - 1), (0, 255, 255), 2)
 
         # Dibujar detecciones que caen en zona minimapa
         minimap_dets = zones.get("minimap", [])
@@ -151,11 +173,10 @@ class DebugVisualizer:
             by2 = min(roi.shape[0], by2 - y1)
             cv2.rectangle(roi, (bx1, by1), (bx2, by2), (0, 255, 0), 1)
 
-        cv2.putText(roi, "Minimap", (5, 15),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        cv2.putText(roi, "Minimap", (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
         return roi
 
-    def log_detections(self, detections: List[Detection], zones: Dict[str, List[Detection]]):
+    def log_detections(self, detections: list[Detection], zones: dict[str, list[Detection]]):
         """Imprime detecciones en consola (modo verbose)."""
         if not self.enabled:
             return
@@ -163,16 +184,18 @@ class DebugVisualizer:
         if not detections:
             return
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Detections: {len(detections)}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         for zone_name, zone_dets in zones.items():
             if zone_dets:
                 print(f"  [{zone_name}]:")
                 for d in zone_dets:
-                    print(f"    - {d.class_name:15s} conf={d.confidence:.2f} "
-                          f"bbox=({d.bbox[0]:.0f},{d.bbox[1]:.0f}) "
-                          f"size={d.bbox[2]-d.bbox[0]:.0f}x{d.bbox[3]-d.bbox[1]:.0f}")
+                    print(
+                        f"    - {d.class_name:15s} conf={d.confidence:.2f} "
+                        f"bbox=({d.bbox[0]:.0f},{d.bbox[1]:.0f}) "
+                        f"size={d.bbox[2] - d.bbox[0]:.0f}x{d.bbox[3] - d.bbox[1]:.0f}"
+                    )
 
     def close(self):
         cv2.destroyAllWindows()

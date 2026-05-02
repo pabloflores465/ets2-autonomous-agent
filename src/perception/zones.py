@@ -3,7 +3,6 @@ Asignación de detecciones a zonas lógicas de percepción.
 Cada zona es una región del frame definida por porcentajes.
 """
 
-from typing import Dict, List
 
 import numpy as np
 
@@ -26,7 +25,7 @@ class ZoneAssigner:
                 "y2": int(zone["y2"] * frame_height),
             }
 
-    def assign(self, detections: List[Detection]) -> Dict[str, List[Detection]]:
+    def assign(self, detections: list[Detection]) -> dict[str, list[Detection]]:
         """
         Clasifica cada detección en una o más zonas.
         Returns:
@@ -42,8 +41,7 @@ class ZoneAssigner:
     def _bbox_in_zone(self, det: Detection, zone: dict) -> bool:
         """Verifica si el centro del bbox está dentro de la zona."""
         cx, cy = det.center_x, det.center_y
-        return (zone["x1"] <= cx <= zone["x2"] and
-                zone["y1"] <= cy <= zone["y2"])
+        return zone["x1"] <= cx <= zone["x2"] and zone["y1"] <= cy <= zone["y2"]
 
     def get_zone_bounds(self, zone_name: str) -> dict:
         """Devuelve los límites en píxeles de una zona."""
@@ -53,6 +51,7 @@ class ZoneAssigner:
 def draw_zones(frame: np.ndarray, assigner: ZoneAssigner) -> np.ndarray:
     """Dibuja las zonas sobre el frame (modo debug)."""
     import cv2
+
     colors = {
         "frontal": (0, 255, 0),
         "capo": (255, 255, 0),
@@ -64,8 +63,8 @@ def draw_zones(frame: np.ndarray, assigner: ZoneAssigner) -> np.ndarray:
     vis = frame.copy()
     for name, zone in assigner.zones.items():
         color = colors.get(name, (128, 128, 128))
-        cv2.rectangle(vis, (zone["x1"], zone["y1"]),
-                      (zone["x2"], zone["y2"]), color, 2)
-        cv2.putText(vis, name, (zone["x1"] + 5, zone["y1"] + 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        cv2.rectangle(vis, (zone["x1"], zone["y1"]), (zone["x2"], zone["y2"]), color, 2)
+        cv2.putText(
+            vis, name, (zone["x1"] + 5, zone["y1"] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1
+        )
     return vis

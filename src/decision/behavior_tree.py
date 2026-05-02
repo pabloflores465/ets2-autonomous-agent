@@ -5,39 +5,18 @@ Usa py_trees para la estructura jerárquica de decisiones.
 
 import py_trees
 
-from src.decision.behaviors.emergency_stop import EmergencyStop
 from src.decision.behaviors.collision_recovery import CollisionRecovery
-from src.decision.behaviors.intersection import IntersectionHandler
-from src.decision.behaviors.obstacle_avoid import ObstacleAvoid
-from src.decision.behaviors.recovery_mode import RecoveryMode
-from src.decision.behaviors.traffic_light import TrafficLightBehavior
-from src.decision.behaviors.stop_sign import StopSignBehavior
-from src.decision.behaviors.yield_pedestrian import YieldPedestrian
-from src.decision.behaviors.overtake import Overtake
-from src.decision.behaviors.lane_follow import LaneFollow
 from src.decision.behaviors.cruise import Cruise
-from src.decision.context import WorldContext, DrivingAction
-
-
-class DrivingAction:
-    """Acción de conducción resultante del BT."""
-
-    def __init__(self, behavior: str, accelerate: float = 0.0,
-                 brake: float = 0.0, steer: float = 0.0,
-                 handbrake: bool = False):
-        self.behavior = behavior       # nombre del comportamiento activo
-        self.accelerate = accelerate   # 0.0 a 1.0
-        self.brake = brake             # 0.0 a 1.0
-        self.steer = steer             # grados (-izq, +der)
-        self.handbrake = handbrake
-
-    def __repr__(self):
-        return (f"DrivingAction({self.behavior}, accel={self.accelerate:.2f}, "
-                f"brake={self.brake:.2f}, steer={self.steer:.1f}°)")
-
-    @staticmethod
-    def idle():
-        return DrivingAction("idle", accelerate=0.0, brake=0.0, steer=0.0)
+from src.decision.behaviors.emergency_stop import EmergencyStop
+from src.decision.behaviors.intersection import IntersectionHandler
+from src.decision.behaviors.lane_follow import LaneFollow
+from src.decision.behaviors.obstacle_avoid import ObstacleAvoid
+from src.decision.behaviors.overtake import Overtake
+from src.decision.behaviors.recovery_mode import RecoveryMode
+from src.decision.behaviors.stop_sign import StopSignBehavior
+from src.decision.behaviors.traffic_light import TrafficLightBehavior
+from src.decision.behaviors.yield_pedestrian import YieldPedestrian
+from src.decision.context import DrivingAction, WorldContext
 
 
 def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.BehaviourTree:
@@ -71,19 +50,21 @@ def build_behavior_tree(world: WorldContext, config: dict) -> py_trees.trees.Beh
     lane_follow = LaneFollow("LaneFollow", world, config)
     cruise = Cruise("Cruise", world, config)
 
-    root.add_children([
-        emergency,
-        collision,
-        intersection,
-        traffic_light,
-        stop_sign,
-        obstacle_avoid,
-        recovery,
-        yield_pedestrian,
-        overtake,
-        lane_follow,
-        cruise,
-    ])
+    root.add_children(
+        [
+            emergency,
+            collision,
+            intersection,
+            traffic_light,
+            stop_sign,
+            obstacle_avoid,
+            recovery,
+            yield_pedestrian,
+            overtake,
+            lane_follow,
+            cruise,
+        ]
+    )
 
     return py_trees.trees.BehaviourTree(root)
 

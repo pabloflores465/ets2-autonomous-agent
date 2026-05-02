@@ -8,12 +8,12 @@ import os
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import List
 
 
 @dataclass
 class CycleMetrics:
     """Métricas de un ciclo de percepción-decisión-actuación."""
+
     timestamp: float
     frame_id: int
     fps: float
@@ -49,8 +49,7 @@ class SessionLogger:
         fh = logging.FileHandler(self.event_file)
         fh.setLevel(logging.DEBUG)
         formatter = logging.Formatter(
-            '%(asctime)s | %(levelname)-8s | %(message)s',
-            datefmt='%H:%M:%S'
+            "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%H:%M:%S"
         )
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
@@ -61,7 +60,7 @@ class SessionLogger:
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
 
-        self.metrics: List[CycleMetrics] = []
+        self.metrics: list[CycleMetrics] = []
         self.start_time: float = 0.0
 
     def start_session(self):
@@ -103,8 +102,7 @@ class SessionLogger:
         # Calcular promedios
         avg_total_ms = sum(m.total_ms for m in self.metrics) / total_frames
         avg_fps = sum(m.fps for m in self.metrics) / total_frames
-        over_budget_pct = (sum(1 for m in self.metrics if m.over_budget) /
-                           total_frames * 100)
+        over_budget_pct = sum(1 for m in self.metrics if m.over_budget) / total_frames * 100
 
         # Distribución de comportamientos
         behaviors = {}
@@ -120,8 +118,7 @@ class SessionLogger:
             "avg_total_ms": round(avg_total_ms, 1),
             "over_budget_pct": round(over_budget_pct, 1),
             "behavior_distribution": {
-                k: round(v / total_frames * 100, 1)
-                for k, v in behaviors.items()
+                k: round(v / total_frames * 100, 1) for k, v in behaviors.items()
             },
         }
 
