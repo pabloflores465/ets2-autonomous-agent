@@ -1,0 +1,111 @@
+# ETS2 Autonomous Driving Agent Configuration
+
+# --- Captura ---
+capture:
+  method: "mss"               # mss (cross-platform)
+  monitor: 1                  # índice del monitor (1 = primario)
+  width: 1280
+  height: 720
+  # Región de la ventana Parsec (en píxeles, desde top-left del monitor)
+  region:
+    left: 0
+    top: 0
+    width: 1280
+    height: 720
+
+# --- Percepción ---
+perception:
+  model: "yolo11n.pt"          # ruta al modelo YOLO
+  device: "mps"                # mps (Apple Silicon), cpu, cuda
+  confidence: 0.35             # umbral de confianza mínimo
+  iou: 0.45                    # umbral NMS IoU
+  classes_of_interest:         # IDs COCO relevantes
+    car: 2
+    truck: 7
+    bus: 5
+    motorcycle: 3
+    person: 0
+    traffic_light: 9
+    stop_sign: 11
+
+  # Zonas de percepción (porcentajes del frame 0-1)
+  zones:
+    frontal:      { x1: 0.15, y1: 0.30, x2: 0.85, y2: 0.85 }
+    capo:         { x1: 0.15, y1: 0.78, x2: 0.85, y2: 1.00 }
+    espejo_izq:   { x1: 0.00, y1: 0.00, x2: 0.15, y2: 0.35 }
+    espejo_der:   { x1: 0.85, y1: 0.00, x2: 1.00, y2: 0.35 }
+    lateral_izq:  { x1: 0.00, y1: 0.20, x2: 0.40, y2: 0.80 }
+    lateral_der:  { x1: 0.60, y1: 0.20, x2: 1.00, y2: 0.80 }
+
+  # Detector de carriles (Canny + HoughLinesP)
+  lane_detector:
+    canny_low: 50
+    canny_high: 150
+    hough_threshold: 30
+    min_line_length: 60
+    max_line_gap: 40
+    roi_top_pct: 0.55
+    roi_bottom_pct: 0.95
+    expected_lane_width_px: 300
+    gps_weight: 0.6
+    lane_weight: 0.4
+    max_steer_degrees: 25.0
+
+  # Minimapa
+  minimap:
+    enabled: true
+    roi: { left_pct: 0.70, top_pct: 0.70, right_pct: 1.00, bottom_pct: 1.00 }
+
+  # Clasificador de semáforo
+  traffic_light:
+    red_hue_ranges: [[0, 10], [160, 180]]
+    yellow_hue_range: [15, 35]
+    green_hue_range: [45, 85]
+    saturation_min: 100
+    value_min: 100
+
+  # Detector de colisiones (optical flow + red flash)
+  collision: {}
+
+  # Detector de velocidad (OCR tablero + optical flow)
+  speed:
+    cruise_speed: 70.0          # km/h objetivo en recta
+    max_speed: 85.0             # km/h máximo
+    curve_speed: 45.0           # km/h en curvas
+    flow_scale: 50.0            # factor flujo → km/h
+
+# --- Decisión ---
+decision:
+  target_hz: 15
+  frame_budget_ms: 66           # 1000/15 con margen
+  emergency_ttc_threshold: 1.0  # segundos a colisión para frenado emergencia
+  safe_distance_px: 150         # distancia mínima frontal (píxeles)
+  stop_wait_seconds: 3          # segundos en STOP (señal alto/rojo)
+  recovery_empty_frames: 3      # frames sin detección → reducir velocidad
+  recovery_stop_frames: 10      # frames sin detección → STOP
+
+# --- Actuación ---
+actuation:
+  steering_sensitivity: 0.40     # píxeles de mouse por grado de giro
+  steering_center_x: 640         # centro horizontal de la ventana
+  steering_center_y: 360         # centro vertical
+  accel_key: "w"
+  brake_key: "s"
+  handbrake_key: "space"
+  reverse_key: "down"          # flecha abajo = reversa
+  emergency_stop_key: "q"
+
+# --- Logging ---
+logging:
+  level: "INFO"
+  log_dir: "data/logs"
+  save_video: false
+  video_fps: 15
+
+# --- Debug ---
+debug:
+  enabled: true                # ventana de visualización
+  verbose_log: true            # logs detallados en consola
+  show_fps: true
+  save_debug_frames: false
+  debug_frame_dir: "data/captures"

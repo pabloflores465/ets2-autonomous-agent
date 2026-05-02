@@ -1,0 +1,239 @@
+"""
+Loop principal de conducción autónoma en ETS2.
+Pipeline: Captura → Percepción → Contexto → Decisión → Actuación
+15 Hz con timeout adaptativo. Pausa/Resume con P, Quit con Q.
+"""
+
+import os
+import sys
+import time
+
+import yaml
+import cv2
+import pyautogui
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
+
+from src.capture.screen_grabber import ScreenGrabber
+from src.perception.detector import YOLODetector
+from src.perception.zones import ZoneAssigner
+from src.perception.traffic_light_classifier import TrafficLightClassifier
+from src.perception.minimap import MinimapProcessor
+from src.perception.lane_detector import LaneDetector
+from src.perception.collision_detector import CollisionDetector
+from src.perception.speed_detector import SpeedDetector
+from src.decision.context import WorldContext
+from src.decision.behavior_tree import build_behavior_tree, get_active_action
+from src.actuation.controller import Controller
+from src.utils.logger import SessionLogger, CycleMetrics
+from src.utils.visualizer import DebugVisualizer
+
+
+class ETS2Agent:
+    """Agente autónomo de conducción para ETS2."""
+
+    def __init__(self, config_path: str = "config.yaml"):
+        with open(config_path) as f:
+            self.config = yaml.safe_load(f)
+
+        self.target_hz = self.config["decision"]["target_hz"]
+        self.frame_budget_ms = 1000.0 / self.target_hz
+        perc = self.config["perception"]
+
+        # Módulos
+        self.grabber = ScreenGrabber(self.config)
+        self.detector = YOLODetector(
+            model_path=perc["model"], device=perc["device"],
+            confidence=perc["confidence"], iou=perc["iou"],
+        )
+        self.zones = ZoneAssigner(self.config, self.grabber.width, self.grabber.height)
+        self.light_classifier = TrafficLightClassifier(self.config)
+        self.minimap = MinimapProcessor(self.config)
+        self.lane_detector = LaneDetector(perc.get("lane_detector"))
+        self.collision_detector = CollisionDetector(perc.get("collision"))
+        self.speed_detector = SpeedDetector(perc.get("speed"))
+
+        self.world = WorldContext()
+        self.bt = build_behavior_tree(self.world, self.config)
+        self.controller = Controller(self.config)
+
+        self.logger = SessionLogger(
+            log_dir=self.config["logging"]["log_dir"],
+            level=self.config["logging"]["level"],
+        )
+
+        debug_enabled = self.config.get("debug", {}).get("enabled", True)
+        self.visualizer = DebugVisualizer(self.config, enabled=debug_enabled)
+
+        self.running = False
+        self.paused = False
+        self.frame_id = 0
+        self._frame_bgr = None
+
+    def run(self):
+        """Loop principal."""
+        self.logger.start_session()
+        self.running = True
+        self.logger.log_event("INFO", "Agent started. Controls: P=pause Q=quit")
+
+        pyautogui.FAILSAFE = True
+        pyautogui.PAUSE = 0.0
+        self.bt.setup(timeout=15)
+
+        while self.running:
+            t_start = time.perf_counter()
+
+            # ── Pausa ──
+            if self.paused:
+                self._show_pause_overlay()
+                time.sleep(0.1)
+                continue
+
+            # ── Captura ──
+            try:
+                frame_rgb = self.grabber.capture()
+                frame_bgr = frame_rgb[:, :, ::-1]
+                self._frame_bgr = frame_bgr
+            except Exception as e:
+                self.logger.log_event("ERROR", f"Capture: {e}")
+                time.sleep(0.05)
+                continue
+
+            # ── Percepción ──
+            t_per = time.perf_counter()
+            detections = self.detector.detect(frame_bgr)
+            zones = self.zones.assign(detections)
+
+            if len(detections) == 0:
+                self.logger.log_event("DEBUG", f"F{self.frame_id}: no objects detected")
+
+            # Semáforo
+            tl_state = None
+            for det in zones.get("frontal", []):
+                if det.class_name == "traffic_light":
+                    tl_state = self.light_classifier.classify(frame_bgr, det).value
+                    break
+
+            # Minimapa + carril + colisión
+            gps_dir, gps_int, truck_xy = self.minimap.process(frame_bgr)
+            lane_info = self.lane_detector.detect(frame_bgr)
+            collision_info = self.collision_detector.detect(frame_bgr)
+            speed_info = self.speed_detector.detect(frame_bgr)
+
+            per_ms = (time.perf_counter() - t_per) * 1000
+
+            # ── Contexto ──
+            self.world.update(
+                detections=detections, zones=zones,
+                gps_direction=gps_dir, gps_intensity=gps_int,
+                truck_minimap_xy=truck_xy,
+                traffic_light_state=tl_state,
+                lane_info=lane_info,
+                collision_info=collision_info,
+                speed_info=speed_info,
+            )
+
+            # ── Decisión ──
+            t_dec = time.perf_counter()
+            self.bt.tick()
+            action = get_active_action(self.bt)
+            reverse_req = getattr(self.bt.root.blackboard, "reverse_requested", False)
+            if getattr(self.bt.root.blackboard, "collision_recovered", False):
+                self.world.collision_recovered = True
+                self.collision_detector.reset()
+                setattr(self.bt.root.blackboard, "collision_recovered", False)
+            dec_ms = (time.perf_counter() - t_dec) * 1000
+
+            # ── Actuación ──
+            t_act = time.perf_counter()
+            cam_look = getattr(self.bt.root.blackboard, "camera_look_angle", 0.0)
+            self.controller.execute(action, duration_ms=50, reverse_requested=reverse_req,
+                                    camera_look_angle=cam_look)
+            act_ms = (time.perf_counter() - t_act) * 1000
+
+            # ── Métricas ──
+            total_ms = (time.perf_counter() - t_start) * 1000
+            over = total_ms > self.frame_budget_ms
+            metrics = CycleMetrics(
+                timestamp=time.time(), frame_id=self.frame_id,
+                fps=1000.0 / total_ms if total_ms > 0 else 0,
+                capture_ms=0, inference_ms=per_ms,
+                decision_ms=dec_ms, actuation_ms=act_ms,
+                total_ms=total_ms,
+                detections_count=len(detections),
+                active_behavior=action.behavior, action=str(action),
+                confidence_sum=sum(d.confidence for d in detections),
+                over_budget=over,
+            )
+            self.logger.log_cycle(metrics)
+
+            # ── Visualización ──
+            if self.visualizer.enabled and self.frame_id % 2 == 0:
+                self.visualizer.log_detections(detections, zones)
+                key = self.visualizer.show(
+                    frame=frame_bgr, bgr_frame=frame_bgr,
+                    detections=detections, zones=zones,
+                    zone_assigner=self.zones,
+                    lane_info=lane_info, lane_detector=self.lane_detector,
+                    minimap_proc=self.minimap,
+                    behavior=action.behavior, action_str=str(action),
+                    fps=metrics.fps, total_ms=total_ms,
+                    frame_id=self.frame_id,
+                    traffic_light=tl_state or "none",
+                    gps_direction=gps_dir.value if gps_dir else "unknown",
+                    collision=(collision_info.collision_detected
+                               if collision_info else False),
+                )
+                # Controles de teclado en ventana
+                if key in (ord('p'), ord(' ')):
+                    self.paused = not self.paused
+                    state = "PAUSED" if self.paused else "RESUMED"
+                    self.logger.log_event("INFO", f"Agent {state}")
+                elif key == ord('q'):
+                    self.logger.log_event("INFO", "Stopped via window")
+                    self.running = False
+
+            # ── Timeout ──
+            elapsed = (time.perf_counter() - t_start) * 1000
+            if elapsed < self.frame_budget_ms:
+                time.sleep((self.frame_budget_ms - elapsed) / 1000)
+            else:
+                self.logger.log_event("WARN",
+                    f"F{self.frame_id} over budget: {elapsed:.0f}ms")
+
+            self.frame_id += 1
+
+        # Shutdown
+        self.controller.emergency_stop()
+        self.bt.shutdown()
+        self.grabber.close()
+        self.visualizer.close()
+        summary = self.logger.end_session()
+        self.logger.log_event("INFO", f"Summary: {summary}")
+
+    def _show_pause_overlay(self):
+        """Overlay de pausa en ventana debug."""
+        if not self.visualizer.enabled or self._frame_bgr is None:
+            return
+        vis = self._frame_bgr.copy()
+        h, w = vis.shape[:2]
+        overlay = vis.copy()
+        cv2.rectangle(overlay, (0, 0), (w, h), (0, 0, 0), -1)
+        cv2.addWeighted(vis, 0.4, overlay, 0.6, 0, vis)
+        cv2.putText(vis, "⏸ PAUSED", (w // 2 - 100, h // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 3)
+        cv2.putText(vis, "P/Space = resume | Q = quit",
+                    (w // 2 - 160, h // 2 + 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.imshow(self.visualizer.window_name, vis)
+        cv2.waitKey(1)
+
+
+def main():
+    agent = ETS2Agent("config.yaml")
+    agent.run()
+
+
+if __name__ == "__main__":
+    main()
