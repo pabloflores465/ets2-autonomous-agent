@@ -85,10 +85,19 @@ class ETS2Agent:
 
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.0
+
+        # Dar foco a ETS2
+        self._focus_ets2()
+
         self.bt.setup(timeout=15)
 
         while self.running:
             t_start = time.perf_counter()
+
+            # ── Emergency stop (Ctrl+C or key) ──
+            if self._check_quit():
+                self.running = False
+                break
 
             # ── Pausa ──
             if self.paused:
@@ -253,6 +262,29 @@ class ETS2Agent:
         )
         cv2.imshow(self.visualizer.window_name, vis)
         cv2.waitKey(1)
+
+    def _focus_ets2(self):
+        """Dar foco a ventana ETS2."""
+        import subprocess
+
+        try:
+            subprocess.run(
+                ["osascript", "-e", 'tell application "Euro Truck Simulator 2" to activate'],
+                capture_output=True,
+                timeout=3,
+            )
+            time.sleep(1.0)
+            pyautogui.click(
+                self.config["actuation"]["steering_center_x"],
+                self.config["actuation"]["steering_center_y"],
+            )
+            self.logger.log_event("INFO", "ETS2 focused + clicked")
+        except Exception as e:
+            self.logger.log_event("WARN", f"Focus failed: {e}")
+
+    def _check_quit(self) -> bool:
+        """Verifica paro manual: Ctrl+C via KeyboardInterrupt."""
+        return False  # Ctrl+C ya lo maneja Python
 
 
 def main():
