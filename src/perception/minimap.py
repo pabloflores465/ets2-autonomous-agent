@@ -31,6 +31,9 @@ class MinimapProcessor:
             cfg["right_pct"],
             cfg["bottom_pct"],
         )
+        # Suavizado temporal de dirección
+        self._angle_history: list[float] = []
+        self._max_history = 5
 
     def process(self, frame: np.ndarray) -> tuple[GPSDirection, float, tuple[float, float]]:
         """
@@ -108,16 +111,26 @@ class MinimapProcessor:
         angle_rad = np.arctan2(principal[1], principal[0])
         angle_deg = np.degrees(angle_rad)
 
-        # Determinar dirección
-        if -30 <= angle_deg <= 30:
+        # Suavizado temporal del ángulo (evita oscilaciones frame a frame)
+        self._angle_history.append(angle_deg)
+        if len(self._angle_history) > self._max_history:
+            self._angle_history.pop(0)
+        angle_deg = np.mean(self._angle_history)
+
+        # Zona muerta más amplia: ±45° es straight
+        # Transición suave: necesitamos |ángulo| > 45° para virar
+        direction = GPSDirection.UNKNOWN
+        intensity = 0.0
+
+        if -45 <= angle_deg <= 45:
             direction = GPSDirection.STRAIGHT
-            intensity = 1.0 - abs(angle_deg) / 30
-        elif angle_deg < -30:
+            intensity = 1.0 - abs(angle_deg) / 45
+        elif angle_deg < -45:
             direction = GPSDirection.TURN_RIGHT
-            intensity = min(1.0, abs(angle_deg) / 90)
+            intensity = min(1.0, (abs(angle_deg) - 45) / 45)
         else:
             direction = GPSDirection.TURN_LEFT
-            intensity = min(1.0, angle_deg / 90)
+            intensity = min(1.0, (angle_deg - 45) / 45)
 
         return direction, intensity
 

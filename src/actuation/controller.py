@@ -41,7 +41,7 @@ class Controller:
 
         # ── Steering con suavizado ──
         steer = action.steer
-        self._steer_smooth = self._steer_smooth * 0.5 + steer * 0.5
+        self._steer_smooth = self._steer_smooth * 0.7 + steer * 0.3
         steer = self._steer_smooth
 
         if steer < -0.5:
