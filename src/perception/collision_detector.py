@@ -113,38 +113,33 @@ class CollisionDetector:
         bw = int(w * self.border_width_pct)
         bh = int(h * self.border_width_pct)
 
-        # Extraer bordes como lista de píxeles
-        border_pixels = []
-        # Top
+        # Definir regiones de borde
+        regions = []
         if bh > 0:
-            border_pixels.append(frame[0:bh, :].reshape(-1, 3))
-        # Bottom
-        if bh > 0:
-            border_pixels.append(frame[h - bh : h, :].reshape(-1, 3))
-        # Left
+            regions.append(frame[0:bh, :])          # top
+            regions.append(frame[h - bh : h, :])    # bottom
         if bw > 0 and (h - 2 * bh) > 0:
-            border_pixels.append(frame[bh : h - bh, 0:bw].reshape(-1, 3))
-        # Right
-        if bw > 0 and (h - 2 * bh) > 0:
-            border_pixels.append(frame[bh : h - bh, w - bw : w].reshape(-1, 3))
+            regions.append(frame[bh : h - bh, 0:bw])          # left
+            regions.append(frame[bh : h - bh, w - bw : w])    # right
 
-        if not border_pixels:
+        if not regions:
             return 0.0
 
-        borders = np.concatenate(border_pixels)
+        total_pixels = 0
+        red_pixels = 0
 
-        # Convertir a HSV para detectar rojo
-        # reshape a (N, 1, 3) para cvtColor
-        borders_reshaped = borders.reshape(-1, 1, 3).astype(np.uint8)
-        hsv = cv2.cvtColor(borders_reshaped, cv2.COLOR_BGR2HSV)
-        hsv = hsv.reshape(-1, 3)
+        for region in regions:
+            if region.size == 0:
+                continue
+            total_pixels += region.shape[0] * region.shape[1]
 
-        # Rojo intenso (daño)
-        mask1 = cv2.inRange(hsv, np.array([0, 150, 100]), np.array([10, 255, 255]))
-        mask2 = cv2.inRange(hsv, np.array([160, 150, 100]), np.array([180, 255, 255]))
-        red_pixels = cv2.countNonZero(mask1) + cv2.countNonZero(mask2)
+            # Detectar rojo en BGR: R >> G y R >> B
+            r, g, b = region[:, :, 2], region[:, :, 1], region[:, :, 0]
+            # Rojo intenso: R > 150 y R > 2*G y R > 2*B
+            red_mask = (r > 150) & (r > 2 * g) & (r > 2 * b)
+            red_pixels += np.count_nonzero(red_mask)
 
-        score = red_pixels / len(borders) if len(borders) > 0 else 0.0
+        score = red_pixels / total_pixels if total_pixels > 0 else 0.0
         return score
 
     def reset(self):
