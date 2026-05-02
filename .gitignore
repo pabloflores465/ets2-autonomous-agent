@@ -7,3 +7,4 @@ data/logs/
 data/captures/
 *.log
 models/
+*.pt
