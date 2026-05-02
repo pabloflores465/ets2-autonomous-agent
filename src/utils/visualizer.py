@@ -287,6 +287,35 @@ class DebugVisualizer:
         (sw, sh), _ = cv2.getTextSize(sub, font, 0.55, 1)
         cv2.putText(img, sub, ((w - sw) // 2, h // 2 + 40), font, 0.55, (200, 200, 200), 1)
 
+    def _draw_no_window_overlay(self, img: np.ndarray):
+        """Overlay cuando no hay ventana de juego/Parsec detectada."""
+        h, w = img.shape[:2]
+        overlay = img.copy()
+        cv2.rectangle(overlay, (0, 0), (w, h), (0, 0, 0), -1)
+        cv2.addWeighted(img, 0.3, overlay, 0.7, 0, img)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text = "Waiting for ETS2 / Parsec..."
+        scale = 1.2
+        thickness = 2
+        (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
+        cv2.putText(img, text, ((w - tw) // 2, h // 2 - 20), font, scale, (0, 200, 255), thickness)
+
+        sub = "Open the game or connect via Parsec"
+        (sw, sh), _ = cv2.getTextSize(sub, font, 0.5, 1)
+        cv2.putText(img, sub, ((w - sw) // 2, h // 2 + 20), font, 0.5, (180, 180, 180), 1)
+
+    def _set_window_on_top(self, window_name: str):
+        """Pone la ventana OpenCV always-on-top vía PyObjC (macOS)."""
+        try:
+            from AppKit import NSApplication, NSFloatingWindowLevel
+            for win in NSApplication.sharedApplication().windows():
+                if win.title() == window_name:
+                    win.setLevel_(NSFloatingWindowLevel)
+                    break
+        except Exception:
+            pass  # fallback silencioso
+
     def show(
         self,
         frame: np.ndarray,
@@ -311,8 +340,25 @@ class DebugVisualizer:
         if not self.enabled:
             return
 
+        # Crear ventanas la primera vez (antes de imshow)
+        if not self._window_created:
+            cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
+            cv2.resizeWindow(self.window_name, 800, 500)
+            cv2.setMouseCallback(self.window_name, self._on_mouse)
+            cv2.namedWindow(self.minimap_window, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
+            cv2.resizeWindow(self.minimap_window, 280, 210)
+            self._window_created = True
+            # Always-on-top
+            self._set_window_on_top(self.window_name)
+            self._set_window_on_top(self.minimap_window)
+
         vis = frame.copy()
         h, w = vis.shape[:2]
+
+        # Detectar frame negro (sin ventana de juego)
+        is_black = (vis.sum() == 0)
+        if is_black:
+            self._draw_no_window_overlay(vis)
 
         # Zonas
         vis = draw_zones(vis, zone_assigner)
@@ -365,15 +411,6 @@ class DebugVisualizer:
         mini_vis = self._render_minimap(bgr_frame, minimap_proc, zones)
         if mini_vis is not None:
             cv2.imshow(self.minimap_window, mini_vis)
-
-        # Crear ventanas + mouse callback una sola vez
-        if not self._window_created:
-            cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(self.window_name, 1280, 720)
-            cv2.setMouseCallback(self.window_name, self._on_mouse)
-            cv2.namedWindow(self.minimap_window, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(self.minimap_window, 360, 270)
-            self._window_created = True
 
         # Teclado (además de los botones)
         key = cv2.waitKey(1) & 0xFF
