@@ -1,19 +1,25 @@
 """
-Blackboard compartido para comunicación entre behaviors.
-py_trees blackboard Client accesible sin ciclos de importación.
+Shared state entre behaviors y main loop.
+Objeto Python simple, sin magia de py_trees blackboard.
 """
 
-import py_trees
+from src.decision.context import DrivingAction
 
-BB = py_trees.blackboard.Client(name="Driving")
-BB.register_key("action", access=py_trees.common.Access.WRITE)
-BB.register_key("reverse_requested", access=py_trees.common.Access.WRITE)
-BB.register_key("camera_look_angle", access=py_trees.common.Access.WRITE)
-BB.register_key("collision_recovered", access=py_trees.common.Access.WRITE)
 
-# Reader client para main.py (solo lectura de los mismos keys)
-BB_READ = py_trees.blackboard.Client(name="DrivingReader")
-BB_READ.register_key("action", access=py_trees.common.Access.READ)
-BB_READ.register_key("reverse_requested", access=py_trees.common.Access.READ)
-BB_READ.register_key("camera_look_angle", access=py_trees.common.Access.READ)
-BB_READ.register_key("collision_recovered", access=py_trees.common.Access.READ)
+class SharedState:
+    """Estado compartido thread-safe entre behaviors y main loop."""
+
+    def __init__(self):
+        self.action: DrivingAction = DrivingAction.idle()
+        self.reverse_requested: bool = False
+        self.camera_look_angle: float = 0.0
+        self.collision_recovered: bool = False
+
+    def reset(self):
+        self.action = DrivingAction.idle()
+        self.reverse_requested = False
+        self.camera_look_angle = 0.0
+
+
+# Instancia única compartida
+BB = SharedState()
